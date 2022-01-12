@@ -5,27 +5,42 @@ Copy MTest.hpp to your source dir.
 ## Example
 ```C++
 #include "MTest.hpp"
-/// Create Unit Test: Name and Section
-UNIT_TEST2(Vector3, Adv)
+
+//! Define test case, give section name and test case name. Tests are executed by section, test case name
+//! must be unique in given section.
+MTEST_UNIT_TEST(Basic, Hello)
 {
-    int a = 2, b = 3;
-    /// CHECK_x - If it will Fail, test will continue execution
-    /// CHECK_TRUE - must evaluate to `true` expression
-    CHECK_TRUE( a == 1 );
-    CHECK_TRUE( b == 3 );
-    /// CHECK_FALSE - must evaluate to `false` expression
-    CHECK_FALSE( b == 2 );
-    /// Print Info to Console
-    INFO( "Hello - 2" );
+    //! Print some information to stdout. 
+    MTEST_INFO( "Hello World" );
+    int a = 7;
+    //! It must evaluate to true statement, if not test will fail but will continue execution.
+    MTEST_CHECK(a == 7);
+    int b = 3;
+    //! Must evaluate to true statement, if not test will fail and will exit.
+    MTEST_ASSERT( (a+b) == 10 );
 }
-/// Create Unit Test: Name
-UNIT_TEST(Abs)
+
+MTEST_UNIT_TEST(Basic, HelloFail)
 {
-    int a = 3;
-    /// Stops Unit test Execution when fails. Must evaluate to true expression.
-    ASSERT_TRUE( a == 0 );
+    int a = 7;
+    int b = 3;
+    //! Must evaluate to false statement, if not test will fail and will exit.
+    MTEST_ASSERT_FALSE( (a+b) == 10 );
 }
-/// Implement main()
+
+MTEST_UNIT_TEST(Adv, Math)
+{
+    int a = 7;
+    //! It must evaluate to true statement, if not test will fail but will continue execution.
+    MTEST_CHECK_TRUE(a == 7);
+    int b = 3;
+    //! It must evaluate to false statement, if not test will fail but will continue execution.
+    MTEST_CHECK_FALSE(b == 3);
+    //! Must evaluate to true statement, if not test will fail and will exit.
+    MTEST_ASSERT_TRUE( (a+b) == 10 );
+}
+
+//! Implements main() function
 MTEST_MAIN
 ```
 ## License

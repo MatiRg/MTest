@@ -20,12 +20,6 @@ else()
 	message(FATAL_ERROR "Unsupported compiler.")
 endif()
 
-#set_property(GLOBAL PROPERTY USE_FOLDERS ON)
-
-#if("${CMAKE_SYSTEM_NAME}" MATCHES "Windows")
-#	set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS ON)
-#endif()
-
 set(SOURCES_EXAMPLES
 	Include/MTest.hpp
 	Example/Main.cpp

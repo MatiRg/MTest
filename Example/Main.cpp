@@ -26,39 +26,39 @@ For more information, please refer to <https://unlicense.org>
 */
 #include "../Include/MTest.hpp"
 
-/// Create Unit Test: Name and Section
-UNIT_TEST2(Vector3, Basic)
+//! Define test case, give section name and test case name. Tests are executed by section, test case name
+//! must be unique in given section.
+MTEST_UNIT_TEST(Basic, Hello)
 {
-    INFO( "Hello" ); /// Print Info
+    //! Print some information to stdout. 
+    MTEST_INFO( "Hello World" );
+    int a = 7;
+    //! It must evaluate to true statement, if not test will fail but will continue execution.
+    MTEST_CHECK(a == 7);
+    int b = 3;
+    //! Must evaluate to true statement, if not test will fail and will exit.
+    MTEST_ASSERT( (a+b) == 10 );
 }
 
-UNIT_TEST2(Vector3, Adv)
+MTEST_UNIT_TEST(Basic, HelloFail)
 {
-    int a = 2, b = 3;
-    CHECK_TRUE( a == 1 ); /// If Fails test will continue
-    CHECK_TRUE( b == 3 );
-    INFO( "Hello - 2" );
+    int a = 7;
+    int b = 3;
+    //! Must evaluate to false statement, if not test will fail and will exit.
+    MTEST_ASSERT_FALSE( (a+b) == 10 );
 }
 
-UNIT_TEST2(Abs, OnlyAssert)
+MTEST_UNIT_TEST(Adv, Math)
 {
-    int a = 3;
-    ASSERT_TRUE( a == 0 ); /// If Fails test will abort
+    int a = 7;
+    //! It must evaluate to true statement, if not test will fail but will continue execution.
+    MTEST_CHECK_TRUE(a == 7);
+    int b = 3;
+    //! It must evaluate to false statement, if not test will fail but will continue execution.
+    MTEST_CHECK_FALSE(b == 3);
+    //! Must evaluate to true statement, if not test will fail and will exit.
+    MTEST_ASSERT_TRUE( (a+b) == 10 );
 }
 
-/// Create Unit Test: Name
-UNIT_TEST(Abs)
-{
-    int a = 3, b = 2;
-    ASSERT_TRUE( a != 0 );
-    int c = 1;
-    CHECK_TRUE( b == c );
-    CHECK_TRUE( a == 3 );
-    CHECK_FALSE( b == 2 );
-    int d = 7;
-    ASSERT_FALSE( d != 0 );
-    ASSERT_TRUE( a == 0 );
-}
-
-/// Implement main()
+//! Implements main() function
 MTEST_MAIN
