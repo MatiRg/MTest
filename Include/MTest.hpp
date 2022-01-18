@@ -171,7 +171,7 @@ namespace MTest
         }
 
         #ifdef MTEST_WINDOWS_PLATFORM
-        int ToWin32Color(const EConsoleColor x)
+        inline int ToWin32Color(const EConsoleColor x)
         {
             switch(x)
             {
@@ -189,7 +189,7 @@ namespace MTest
             }
         }
         #else
-        std::string ToAnsiColor(const EConsoleColor x)
+        inline std::string ToAnsiColor(const EConsoleColor x)
         {
             switch(x)
             {
@@ -209,7 +209,7 @@ namespace MTest
         #endif // MTEST_WINDOWS_PLATFORM
     }
 
-    std::ostream& operator<<(std::ostream& Stream, const EConsoleColor x)
+    inline std::ostream& operator<<(std::ostream& Stream, const EConsoleColor x)
     {
         #ifdef MTEST_WINDOWS_PLATFORM
         SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Detail::ToWin32Color(x));

@@ -48,7 +48,7 @@ MTEST_UNIT_TEST(Basic, HelloFail)
     MTEST_ASSERT_FALSE( (a+b) == 10 );
 }
 
-MTEST_UNIT_TEST(Adv, Math)
+MTEST_UNIT_TEST(Other, MathFail)
 {
     int a = 7;
     //! It must evaluate to true statement, if not test will fail but will continue execution.

@@ -1,5 +1,7 @@
 # MTest 
 MTest is small, quick and dirty, header-only C++17 Unit Test library inspired by Catch2.
+Example console (PowerShell) output is shown below.
+![alt text](ConsoleOutput.JPG "Example console (PowerShell) output.") 
 ## Installing
 Copy MTest.hpp to your source dir.
 ## Example
@@ -28,7 +30,7 @@ MTEST_UNIT_TEST(Basic, HelloFail)
     MTEST_ASSERT_FALSE( (a+b) == 10 );
 }
 
-MTEST_UNIT_TEST(Adv, Math)
+MTEST_UNIT_TEST(Other, MathFail)
 {
     int a = 7;
     //! It must evaluate to true statement, if not test will fail but will continue execution.
