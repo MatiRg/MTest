@@ -1,6 +1,6 @@
 # MTest 
 MTest is small, quick and dirty, header-only C++17 Unit Test library inspired by Catch2.
-Example console (PowerShell) output is shown below.
+## Example console output
 ![alt text](ConsoleOutput.JPG "Example console (PowerShell) output.") 
 ## Installing
 Copy MTest.hpp to your source dir.
