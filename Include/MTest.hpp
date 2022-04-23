@@ -136,11 +136,13 @@ namespace MTest \
 } \
 void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)()
 
+#define MTEST_IMPLEMENT_MAIN MTest::CTestManager::Instance().Run()
+
 //! Use to Implement main()
 #define MTEST_MAIN \
 int main(int, char*[]) \
 { \
-    MTest::CTestManager::Instance().Run(); \
+    MTEST_IMPLEMENT_MAIN; \
 	return 0; \
 }
 
