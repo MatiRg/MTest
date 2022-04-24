@@ -33,6 +33,8 @@ For more information, please refer to <https://unlicense.org>
 #include <ostream>
 #include <unordered_map>
 #include <memory>
+#include <utility>
+#include <type_traits>
 
 // _WIN64   - 64 bit
 // _WIN32   - 32 i 64 bit
@@ -124,21 +126,33 @@ while(false)
 //! It must evaluate to true statement, if not test will fail but will continue execution.
 #define MTEST_CHECK(Cond) MTEST_CHECK_TRUE(Cond)
 
-#define MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) Section##Name##Test
+#define MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) Section##Name##TestMethod
+#define MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) CFixtureImpl##Section##Name
+#define MTEST_DETAIL_GENERATE_TEST_FULL_NAME(Section, Name) MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) :: MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)
+
+//! Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
+//! must be unique in given section.
+#define MTEST_UNIT_TEST_F(Section, Name, Fixture) \
+namespace MTest \
+{ \
+    class MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name): public Fixture \
+    { \
+    public: \
+        void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)(); \
+    }; \
+    STestProxy ut##Section##Name##Inst( #Section, #Name , __FILE__ , __LINE__ , \
+        Detail::CreateUnitTestInfoPair< MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) >( &MTEST_DETAIL_GENERATE_TEST_FULL_NAME(Section, Name) ) ); \
+} \
+void MTest:: MTEST_DETAIL_GENERATE_TEST_FULL_NAME(Section, Name)()
 
 //! Define test case, give section name and test case name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) \
-void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)(); \
-namespace MTest \
-{ \
-    STestProxy ut##Section##Name##Inst( #Section, #Name , __FILE__ , __LINE__ , MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) ); \
-} \
-void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)()
+#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_F(Section, Name, MTest::IFixture)
 
+//! Use to launch test application.
 #define MTEST_IMPLEMENT_MAIN MTest::CTestManager::Instance().Run()
 
-//! Use to Implement main()
+//! Use to Implement main().
 #define MTEST_MAIN \
 int main(int, char*[]) \
 { \
@@ -277,21 +291,36 @@ namespace MTest
         }
     };
 
+    //! Can be used to init some data before each test. Test function has access to its internals (excluding private).
+    class IFixture
+    {
+    public:
+        IFixture() = default;
+        virtual ~IFixture() = default;
+
+        //! Should return false if something bad happens.
+        virtual bool Setup() { return true; }
+        //! Cleanup if needed.
+        virtual void Cleanup() {}
+    };
+
+    using FixturePtr = std::unique_ptr<IFixture>;
+    using UnitTestCallback = std::function<void()>;
+    using UnitTestInfoPair = std::pair<FixturePtr, UnitTestCallback>;
+
     class CTestManager final
     {
     public:
-        class CUnitTest;
-        using UnitTestCallback = std::function<void()>;
-        //
         class CUnitTest
         {
         public:
-            CUnitTest(const std::string& section, const std::string& name, const std::string& file, const int line, const UnitTestCallback& func):
+            CUnitTest(const std::string& section, const std::string& name, const std::string& file, const int line, UnitTestInfoPair&& infoPair):
                 Section(section),
                 Name( name ),
                 File( file ),
                 Line( line ),
-                Func( func )
+                Fixture( std::move(infoPair.first) ),
+                Func( std::move(infoPair.second) )
             {
             }
 
@@ -308,6 +337,11 @@ namespace MTest
                 MTEST_LOG << EConsoleColor::Blue << "[Test]: File: " << Detail::GetFileName(File) << ", Line: " << Line << EConsoleColor::Default << MTEST_NEW_LINE;
                 try
                 {
+                    if( !Fixture->Setup() )
+                    {
+                        throw std::logic_error{"Error during fixture setup"};
+                    }
+                    //
                     Func();
                 }
                 catch(const CAssert& As)
@@ -325,6 +359,7 @@ namespace MTest
                     Fail();
                     MTEST_LOG << EConsoleColor::Red << "[Exception]: Unknown" << EConsoleColor::Default << MTEST_NEW_LINE;
                 }
+                //
                 if( !IsFailed() )
                 {
                     MTEST_LOG << EConsoleColor::Green << "[Test]: " << Name << " - Passed" << EConsoleColor::Default << MTEST_NEW_LINE;
@@ -340,6 +375,8 @@ namespace MTest
                         MTEST_LOG << EConsoleColor::Red << "[Test]: " << Name << " - Failed, Failed Checks - " << ChecksFailed << EConsoleColor::Default << MTEST_NEW_LINE;
                     }
                 }
+                //
+                Fixture->Cleanup();
             }
 
             void OnCheckFail()
@@ -395,6 +432,7 @@ namespace MTest
             std::string Name;
             std::string File;
             int Line;
+            FixturePtr Fixture;
             UnitTestCallback Func;
             int ChecksFailed = 0;
             bool Failed = false;
@@ -408,7 +446,7 @@ namespace MTest
 
         CUnitTest* GetActiveUnitTest() const { return ActiveUnitTest; }
 
-        void Add(const std::string& Section, const std::string& Name, const std::string& File, const int Line, const UnitTestCallback& Func)
+        void Add(const std::string& Section, const std::string& Name, const std::string& File, const int Line, UnitTestInfoPair&& infoPair)
         {
             auto& SectionContainer = Sections[Section];
 
@@ -418,12 +456,12 @@ namespace MTest
 
             if( It != SectionContainer.end() )
             {
-                MTEST_LOG << EConsoleColor::Red << "[Error]: Test: " << CUnitTest::MakeDisplayString(Section, Name) << " Already Exists" 
+                MTEST_LOG << EConsoleColor::Red << "[Error]: Test: " << CUnitTest::MakeDisplayString(Section, Name) << " Already Exists"
                     << EConsoleColor::Default << MTEST_NEW_LINE;
                 return;
             }
 
-            SectionContainer.emplace_back( std::make_unique<CUnitTest>(Section, Name, File, Line, Func) );
+            SectionContainer.emplace_back( std::make_unique<CUnitTest>(Section, Name, File, Line, std::forward<UnitTestInfoPair>(infoPair) ) );
         }
 
         void Run()
@@ -496,11 +534,23 @@ namespace MTest
         #endif // MTEST_WINDOWS_PLATFORM
     };
 
+    namespace Detail
+    {
+        template<class C, class F>
+        UnitTestInfoPair CreateUnitTestInfoPair(F func)
+        {
+            static_assert(std::is_base_of<IFixture, C>::value, "Must be base of IFixture");
+            std::unique_ptr<C> fixture = std::make_unique<C>();
+            UnitTestCallback callback = std::bind(func, fixture.get());
+            return {std::move(fixture), callback};
+        }
+    }
+
     struct STestProxy
     {
-        STestProxy(const std::string& Section, const std::string& Name, const std::string& File, const int Line, const CTestManager::UnitTestCallback& Func)
+        STestProxy(const std::string& Section, const std::string& Name, const std::string& File, const int Line, UnitTestInfoPair&& infoPair)
         {
-            CTestManager::Instance().Add( Section, Name, File, Line, Func );
+            CTestManager::Instance().Add( Section, Name, File, Line, std::forward<UnitTestInfoPair>(infoPair) );
         }
     };
 }
