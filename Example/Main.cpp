@@ -58,7 +58,7 @@ MTEST_UNIT_TEST(Other, MathFail)
 }
 
 //! Create fixture. Fixture is created everytime when test case is run.
-class CTestFixture: public MTest::IFixture
+class CMathOperationsFixture: public MTest::IFixture
 {
 public:
     //! Can be used to init some data. Return false if something goes wrong.
@@ -80,9 +80,23 @@ protected:
 };
 
 //! Create test case with user fixture.
-MTEST_UNIT_TEST_F(Advanced, CheckSomething, CTestFixture)
+//! Fixture name is created as follows: 'C' + MathOperations + 'Fixture'
+MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 {
     MTEST_ASSERT(MyField == 6);
+    int* Tmp = nullptr;
+    MTEST_LOG << "Checking for NULL" << MTEST_NEW_LINE;
+    MTEST_ASSERT_NULL(Tmp);
+}
+
+//! Similar as above
+MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, CMathOperationsFixture)
+{
+    int b = 3;
+    MTEST_ASSERT(MyField == 6);
+    int* Tmp = &b;
+    MTEST_ASSERT_NOT_NULL(Tmp);
+    MTEST_ASSERT( MyField != *Tmp );
 }
 
 //! Implements main() function
@@ -93,6 +107,7 @@ MTEST_MAIN
 int main(int, char*[])
 {
     // Some logic here
+    MTest::CLog::Instance().AddWriter<MTest::CStdWriter>();
     MTEST_IMPLEMENT_MAIN; //! Will run test application.
     // ... and some logic here
 	return 0;

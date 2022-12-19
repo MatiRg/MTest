@@ -32,6 +32,13 @@ SOFTWARE.
 #include <memory>
 #include <utility>
 #include <type_traits>
+#include <stdexcept>
+#include <source_location>
+#include <cstdint>
+#include <sstream>
+#include <optional>
+#include <concepts>
+#include <fstream>
 
 // _WIN64   - 64 bit
 // _WIN32   - 32 i 64 bit
@@ -57,102 +64,92 @@ SOFTWARE.
 
 // Macros for output
 #ifndef MTEST_LOG
-#define MTEST_LOG std::cout
+#define MTEST_LOG MTest::CLog::Instance()
 #endif // MTEST_LOG
 
 #ifndef MTEST_NEW_LINE
-#define MTEST_NEW_LINE std::endl
+#define MTEST_NEW_LINE "\n"
 #endif // MTEST_NEW_LINE
 
-//! Print some information to stdout.
-#define MTEST_INFO(Msg) MTEST_LOG << MTest::EConsoleColor::Default << "[Info]: " << Msg << MTEST_NEW_LINE
-
-#define MTEST_DETAIL_ASSERT_BASE(Cond) throw MTest::CAssert( #Cond , __FILE__ , __LINE__ )
-
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT_TRUE(Cond) \
-do \
-{ \
-    if( !(Cond) ) \
-    { \
-        MTEST_DETAIL_ASSERT_BASE(Cond); \
-    } \
-} \
-while(false)
-
-//! Must evaluate to false statement, if not test will fail and will exit.
-#define MTEST_ASSERT_FALSE(Cond) \
-do \
-{ \
-    if( (Cond) ) \
-    { \
-        MTEST_DETAIL_ASSERT_BASE(Cond); \
-    } \
-} \
-while(false)
-
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT(Cond) MTEST_ASSERT_TRUE(Cond)
-
-#define MTEST_DETAIL_CHECK_BASE(Cond) \
-MTest::CTestManager::Instance().GetActiveUnitTest()->OnCheckFail(); \
-MTEST_LOG << MTest::EConsoleColor::Yellow << MTest::CCheck( #Cond , __FILE__ , __LINE__ ) << MTest::EConsoleColor::Default << MTEST_NEW_LINE
-
 //! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_TRUE(Cond) \
-do \
-{ \
-    if( !(Cond) ) \
-    { \
-        MTEST_DETAIL_CHECK_BASE(Cond); \
-    } \
-} \
-while(false)
+#define MTEST_CHECK_TRUE(Cond) MTest::ITestManager::GetActiveCase()->Check( #Cond , (Cond) )
 
 //! It must evaluate to false statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_FALSE(Cond) \
-do \
-{ \
-    if( (Cond) ) \
-    { \
-        MTEST_DETAIL_CHECK_BASE(Cond); \
-    } \
-} \
-while(false)
+#define MTEST_CHECK_FALSE(Cond) MTest::ITestManager::GetActiveCase()->Check( #Cond , !(Cond) )
 
 //! It must evaluate to true statement, if not test will fail but will continue execution.
 #define MTEST_CHECK(Cond) MTEST_CHECK_TRUE(Cond)
 
-#define MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) Section##Name##TestMethod
+//! It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_NULL(Value) MTEST_CHECK(Value == nullptr)
+
+//! It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_NOT_NULL(Value) MTEST_CHECK(Value != nullptr)
+
+//! Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_TRUE(Cond) MTest::ITestManager::GetActiveCase()->Assert( #Cond , (Cond) )
+
+//! Must evaluate to false statement, if not test will fail and will exit.
+#define MTEST_ASSERT_FALSE(Cond) MTest::ITestManager::GetActiveCase()->Assert( #Cond , !(Cond) )
+
+//! Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT(Cond) MTEST_ASSERT_TRUE(Cond)
+
+//! Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_NULL(Value) MTEST_ASSERT(Value == nullptr)
+
+//! Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_NOT_NULL(Value) MTEST_ASSERT(Value != nullptr)
+
+//
+
+//! Print some information to stdout.
+#define MTEST_INFO(Msg) MTEST_LOG << MTest::EConsoleColor::Default << "[Message] " << Msg << MTEST_NEW_LINE
+
+// For No Fixture Tests
+#define MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) Section##Name##TestFunction
+#define MTEST_DETAIL_GENERATE_TEST_NAME_FIXTURE(Section, Name) Section##Name##TestMethod
 #define MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) CFixtureImpl##Section##Name
-#define MTEST_DETAIL_GENERATE_TEST_FULL_NAME(Section, Name) MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) :: MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)
+#define MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name) MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) :: MTEST_DETAIL_GENERATE_TEST_NAME_FIXTURE(Section, Name)
 
 //! Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST_F(Section, Name, Fixture) \
+#define MTEST_UNIT_TEST_FX(Section, Name, Fixture) \
 namespace MTest \
 { \
     class MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name): public Fixture \
     { \
     public: \
-        void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)(); \
+        void MTEST_DETAIL_GENERATE_TEST_NAME_FIXTURE(Section, Name)(); \
     }; \
-    STestProxy ut##Section##Name##Inst( #Section, #Name , __FILE__ , __LINE__ , \
-        Detail::CreateUnitTestInfoPair< MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) >( &MTEST_DETAIL_GENERATE_TEST_FULL_NAME(Section, Name) ) ); \
+    STestProxy ut##Section##Name##Inst( #Section, #Name , std::source_location::current() , \
+        CTestManager::CreateUnitTestFixtureInfoPair< MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) >( &MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name) ) ); \
 } \
-void MTest:: MTEST_DETAIL_GENERATE_TEST_FULL_NAME(Section, Name)()
+void MTest:: MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name)()
+
+//! Define test case, give section name, test case name. Fixture name is deffered from section name eg. C + 'Section Name' + Fixture
+//! Tests are executed by section, test case name must be unique in given section.
+#define MTEST_UNIT_TEST_F(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, C##Section##Fixture )
 
 //! Define test case, give section name and test case name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_F(Section, Name, MTest::IFixture)
+#define MTEST_UNIT_TEST(Section, Name) \
+namespace MTest \
+{ \
+    void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)(); \
+    STestProxy ut##Section##Name##Inst( #Section, #Name , std::source_location::current() , \
+        CTestManager::CreateUnitTestInfoPair( &MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) ) ); \
+} \
+void MTest:: MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)()
 
-//! Use to launch test application.
+//! Use to launch unit test application.
 #define MTEST_IMPLEMENT_MAIN MTest::CTestManager::Instance().Run()
 
-//! Use to Implement main().
+//! Use to Implement Unit test main().
 #define MTEST_MAIN \
 int main(int, char*[]) \
 { \
+    MTest::CLog::Instance().AddWriter<MTest::CStdWriter>(); \
     MTEST_IMPLEMENT_MAIN; \
 	return 0; \
 }
@@ -232,59 +229,149 @@ namespace MTest
         return Stream;
     }
 
-    class ICheck
+    class IWriter
     {
     public:
-        ICheck(const std::string& condition, const std::string& file, const int line):
-            Condition( condition ),
-            File( file ),
-            Line( line )
-        {
-        }
+        IWriter() {}
+        virtual ~IWriter() {}
 
-        virtual ~ICheck() = default;
-
-        virtual std::string ToString() const
-        {
-            return "Failed: "+Condition+", File: "+Detail::GetFileName(File)+", Line: "+std::to_string(Line);
-        }
-    protected:
-        std::string Condition;
-        std::string File;
-        int Line;
+        virtual void Write(const EConsoleColor) = 0;
+        virtual void Write(const std::string&) = 0;
     };
 
-    inline std::ostream& operator<<(std::ostream& Stream, const ICheck& Assert)
+    class CStdWriter: public IWriter
     {
-        Stream << Assert.ToString();
+    public:
+        void Write(const EConsoleColor x) override { std::cout << x; }
+        void Write(const std::string& x) override { std::cout << x; }
+    };
+
+    class CFileWriter: public IWriter
+    {
+    public:
+        CFileWriter(const std::string& path):
+            Stream(path)
+        {
+        }
+
+        void Write(const EConsoleColor) override
+        {
+            // Nothing
+        }
+
+        void Write(const std::string& x) override
+        {
+            if( Stream.is_open() && Stream.good() )
+            {
+                Stream << x;
+            }
+        }
+    private:
+        std::ofstream Stream;
+    };
+
+    class CLog final
+    {
+    public:
+        static CLog& Instance()
+        {
+            static CLog Log;
+            return Log;
+        }
+
+        template<std::derived_from<IWriter> T, class...Args>
+        void AddWriter(Args&&...args)
+        {
+            Writers.emplace_back( std::make_unique<T>(std::forward<Args>(args)...) );
+        }
+
+        CLog& operator<<(const std::string& Value)
+        {
+            for(const auto& i: Writers)
+            {
+                i->Write(Value);
+            }
+            return *this;
+        }
+
+        CLog& operator<<(const char* Value)
+        {
+            for(const auto& i: Writers)
+            {
+                i->Write(Value);
+            }
+            return *this;
+        }
+
+        CLog& operator<<(const EConsoleColor Value)
+        {
+            for(const auto& i: Writers)
+            {
+                i->Write(Value);
+            }
+            return *this;
+        }
+
+        template<class T>
+        CLog& operator<<(const T& Value)
+        {
+            // Reuse
+            static std::ostringstream stream;
+            for(const auto& i: Writers)
+            {
+                stream << Value;
+                i->Write( stream.str() );
+                stream.str("");
+                stream.clear();
+            }
+            return *this;
+        }
+    private:
+        std::vector<std::unique_ptr<IWriter>> Writers;
+    };
+
+    struct SFailInfo
+    {
+        SFailInfo(const bool isAssert, const std::string& condition, const std::source_location& location):
+            IsAssert(isAssert),
+            Condition(condition),
+            File(Detail::GetFileName(location.file_name())),
+            Line(location.line())
+        {
+        }
+
+        bool IsAssertion() const { return IsAssert; }
+        const std::string& GetCondition() const { return Condition; }
+        const std::string& GetFile() const { return File; }
+        std::uint_least32_t GetLine() const { return Line; }
+
+        //! Gets formated string for display
+        std::string ToString() const
+        {
+            const std::string Prefix = IsAssert ? "[ Abort ] " : "[ Check ] ";
+            std::ostringstream stream;
+            stream << Prefix << Condition  << ", File: " << File << ", Line: " << Line;
+            return stream.str();
+        }
+
+        bool IsAssert;
+        std::string Condition;
+        std::string File;
+        std::uint_least32_t Line;
+    };
+
+    inline std::ostream& operator<<(std::ostream& Stream, const SFailInfo& Info)
+    {
+        Stream << Info.ToString();
         return Stream;
     }
 
-    class CCheck: public ICheck
+    class CTestAbortedException: public std::logic_error
     {
     public:
-        CCheck(const std::string& condition, const std::string& file, const int line):
-            ICheck( condition, file, line )
+        CTestAbortedException():
+            std::logic_error("Test Aborted")
         {
-        }
-
-        std::string ToString() const override
-        {
-            return "[Check]: " + ICheck::ToString();
-        }
-    };
-
-    class CAssert: public ICheck
-    {
-    public:
-        CAssert(const std::string& condition, const std::string& file, const int line):
-            ICheck( condition, file, line )
-        {
-        }
-
-        std::string ToString() const override
-        {
-            return "[Assert]: " + ICheck::ToString();
         }
     };
 
@@ -305,134 +392,321 @@ namespace MTest
     using UnitTestCallback = std::function<void()>;
     using UnitTestInfoPair = std::pair<FixturePtr, UnitTestCallback>;
 
-    class CTestManager final
+    class ITestCase
     {
     public:
-        class CUnitTest
+        ITestCase(const std::string& section, const std::string& name, const std::source_location& location):
+            Section(section),
+            Name( name ),
+            File( Detail::GetFileName(location.file_name()) ),
+            Line( location.line() )
+        {
+        }
+
+        virtual ~ITestCase() = default;
+
+        ITestCase(const ITestCase&) = delete;
+        ITestCase& operator=(const ITestCase&) = delete;
+
+        ITestCase(ITestCase&&) = default;
+        ITestCase& operator=(ITestCase&&) = default;
+
+        const std::string& GetSection() const
+        {
+            return Section;
+        }
+
+        const std::string& GetName() const
+        {
+            return Name;
+        }
+
+        const std::string& GetFile() const
+        {
+            return File;
+        }
+
+        std::uint_least32_t GetLine() const
+        {
+            return Line;
+        }
+
+        bool IsFailed() const
+        {
+            return Failed;
+        }
+
+        const std::vector<SFailInfo>& GetFailedChecks() const
+        {
+            return FailedChecks;
+        }
+
+        const std::optional<SFailInfo>& GetFailedAssertion() const
+        {
+            return FailedAssertion;
+        }
+
+        std::string GetDisplayString() const
+        {
+            return MakeDisplayString(Section, Name);
+        }
+
+        static std::string MakeDisplayString(const std::string& section, const std::string& name)
+        {
+            return section + "." + name;
+        }
+
+        //! Returns true when pass
+        bool Check(const std::string& Condition, const bool IsSuccess, std::source_location Location = std::source_location::current())
+        {
+            if( !IsSuccess )
+            {
+                Fail();
+                FailedChecks.push_back( SFailInfo{false, Condition, Location} );
+                MTEST_LOG << MTest::EConsoleColor::Yellow << FailedChecks.back() << MTest::EConsoleColor::Default << MTEST_NEW_LINE;
+                return false;
+            }
+            return true;
+        }
+
+        void Assert(const std::string& Condition, const bool IsSuccess, std::source_location Location = std::source_location::current())
+        {
+            if( !IsSuccess )
+            {
+                Fail();
+                FailedAssertion = SFailInfo{true, Condition, Location};
+                MTEST_LOG << EConsoleColor::Red << FailedAssertion.value() << EConsoleColor::Default << MTEST_NEW_LINE;
+                throw CTestAbortedException();
+            }
+        }
+
+        void OnException(const std::string& What)
+        {
+            Fail();
+            MTEST_LOG << EConsoleColor::Red << "[Failure] " << What << EConsoleColor::Default << MTEST_NEW_LINE;
+        }
+
+        void PrintTestInfo()
+        {
+            MTEST_LOG << EConsoleColor::Blue << "[ Start ] " << GetDisplayString() << EConsoleColor::Default << MTEST_NEW_LINE;
+        }
+
+        void PrintTestResult()
+        {
+            if( !IsFailed() )
+            {
+                MTEST_LOG << EConsoleColor::Green << "[Success] " << GetDisplayString() << EConsoleColor::Default << MTEST_NEW_LINE;
+            }
+            else
+            {
+                MTEST_LOG << EConsoleColor::Red << "[Failure] " << GetDisplayString() << EConsoleColor::Default << MTEST_NEW_LINE;
+            }
+        }
+    protected:
+        void Fail()
+        {
+            Failed = true;
+        }
+
+        template<class F>
+        void PassRunner(F Callback)
+        {
+            try
+            {
+                Callback();
+            }
+            catch(const CTestAbortedException&) // Do Nothing
+            {
+            }
+            catch(const std::exception& Exception)
+            {
+                OnException( Exception.what() );
+            }
+            catch(...)
+            {
+                OnException( "Unknown" );
+            }
+        }
+    protected:
+        std::string Section;
+        std::string Name;
+        std::string File;
+        std::uint_least32_t Line;
+        std::vector<SFailInfo> FailedChecks;
+        std::optional<SFailInfo> FailedAssertion;
+        bool Failed = false;
+    };
+
+    //! Common Functionality that can be used to implement eg. Integration Tests
+    class ITestManager
+    {
+    public:
+        ITestManager()
+        {
+            #ifdef MTEST_WINDOWS_PLATFORM
+            GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Detail::ToWin32Color(EConsoleColor::Default));
+            #endif // MTEST_WINDOWS_PLATFORM
+        }
+
+        virtual ~ITestManager()
+        {
+            #ifdef MTEST_WINDOWS_PLATFORM
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), csbi.wAttributes);
+            #endif // MTEST_WINDOWS_PLATFORM
+        }
+
+        ITestManager(const ITestManager&) = delete;
+        ITestManager& operator=(const ITestManager&) = delete;
+
+        ITestManager(ITestManager&&) = delete;
+        ITestManager& operator=(ITestManager&&) = delete;
+
+        template<std::derived_from<ITestCase> T, class...Args>
+        void Add(const std::string& Section, const std::string& Name, const std::source_location& location, Args&&...args)
+        {
+            auto& SectionContainer = Sections[Section];
+            auto It = std::find_if(SectionContainer.begin(), SectionContainer.end(), [&](const std::unique_ptr<ITestCase>& Other)
+            {
+                return Other->GetName() == Name;
+            });
+            if( It != SectionContainer.end() )
+            {
+                MTEST_LOG << EConsoleColor::Red << "[ Error ] " << ITestCase::MakeDisplayString(Section, Name) << " Already Exists"
+                    << EConsoleColor::Default << MTEST_NEW_LINE;
+                return;
+            }
+            SectionContainer.emplace_back( std::make_unique<T>( Section, Name, location, std::forward<Args>(args)... ) );
+        }
+
+        void UpdateCaseStatus(ITestCase* testCase)
+        {
+            if( testCase )
+            {
+                if( testCase->IsFailed() )
+                {
+                    FailedTestCases.push_back( testCase );
+                }
+            }
+        }
+
+        void Clear()
+        {
+            Sections.clear();
+            FailedTestCases.clear();
+            ActiveCase = nullptr;
+        }
+
+        std::size_t GetSectionTestCount(const std::string& section) const
+        {
+            if( !Sections.count(section) )
+            {
+                return 0u;
+            }
+            return Sections.at(section).size();
+        }
+
+        const std::unordered_map<std::string, std::vector<std::unique_ptr<ITestCase>>>& GetSections() const
+        {
+            return Sections;
+        }
+
+        void PrintStart()
+        {
+            int testCount = 0;
+            for(const auto& i: Sections)
+            {
+                testCount += i.second.size();
+            }
+            MTEST_LOG << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
+                      << Sections.size() << " sections" << EConsoleColor::Default << MTEST_NEW_LINE;
+        }
+
+        void PrintSectionInfo(const std::string& name)
+        {
+            MTEST_LOG << EConsoleColor::Blue << "[-------] Running section " << name << " which has " << GetSectionTestCount(name) << " tests" << EConsoleColor::Default << MTEST_NEW_LINE;
+        }
+
+        void PrintSummary()
+        {
+            if( FailedTestCases.size() )
+            {
+                MTEST_LOG << EConsoleColor::Red << "[Manager] Failed Unit Tests: " << FailedTestCases.size() << EConsoleColor::Default << MTEST_NEW_LINE;
+                for(const auto& i: FailedTestCases)
+                {
+                    MTEST_LOG << EConsoleColor::Red << "[Failure] " << i->GetDisplayString() << ", File: " <<
+                        i->GetFile() << ", Line: " << i->GetLine() << EConsoleColor::Default << MTEST_NEW_LINE;
+                }
+            }
+            else
+            {
+                MTEST_LOG << EConsoleColor::Green << "[Manager] All Passed" << EConsoleColor::Default << MTEST_NEW_LINE;
+            }
+        }
+
+        static void SetActiveCase(ITestCase* testCase)
+        {
+            ActiveCase = testCase;
+        }
+
+        static ITestCase* GetActiveCase()
+        {
+            return ActiveCase;
+        }
+
+        template<std::derived_from<ITestCase> T>
+        static T* GetActiveCaseAs()
+        {
+            return dynamic_cast<T*>(ActiveCase);
+        }
+    protected:
+        std::unordered_map<std::string, std::vector<std::unique_ptr<ITestCase>>> Sections;
+        std::vector<ITestCase*> FailedTestCases;
+        static inline ITestCase* ActiveCase = nullptr;
+    private:
+        #ifdef MTEST_WINDOWS_PLATFORM
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        #endif // MTEST_WINDOWS_PLATFORM
+    };
+
+    //! Unit test manager
+    class CTestManager final: public ITestManager
+    {
+    public:
+        class CUnitTest final: public ITestCase
         {
         public:
-            CUnitTest(const std::string& section, const std::string& name, const std::string& file, const int line, UnitTestInfoPair&& infoPair):
-                Section(section),
-                Name( name ),
-                File( file ),
-                Line( line ),
+            CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, UnitTestInfoPair&& infoPair):
+                ITestCase(section, name, location),
                 Fixture( std::move(infoPair.first) ),
                 Func( std::move(infoPair.second) )
             {
             }
 
-            CUnitTest(const CUnitTest&) = delete;
-            CUnitTest(CUnitTest&&) = default;
-
-            CUnitTest& operator=(const CUnitTest&) = delete;
-            CUnitTest& operator=(CUnitTest&&) = default;
-
             void Run()
             {
-                MTEST_LOG << MTEST_NEW_LINE;
-                MTEST_LOG << EConsoleColor::Blue << "[Test]: " << Name << EConsoleColor::Default << MTEST_NEW_LINE;
-                MTEST_LOG << EConsoleColor::Blue << "[Test]: File: " << Detail::GetFileName(File) << ", Line: " << Line << EConsoleColor::Default << MTEST_NEW_LINE;
-                try
+                PrintTestInfo();
+                //
+                PassRunner([&]()
                 {
-                    if( !Fixture->Setup() )
+                    if( Fixture && !Fixture->Setup() )
                     {
-                        throw std::logic_error{"Error during fixture setup"};
+                        throw std::runtime_error{"Error during fixture setup"};
                     }
                     //
                     Func();
-                }
-                catch(const CAssert& As)
+                });
+                //
+                if( Fixture )
                 {
-                    Fail();
-                    MTEST_LOG << EConsoleColor::Red << As << EConsoleColor::Default << MTEST_NEW_LINE;
-                }
-                catch(const std::exception& Exception)
-                {
-                    Fail();
-                    MTEST_LOG << EConsoleColor::Red << "[Exception]: " << Exception.what() << EConsoleColor::Default << MTEST_NEW_LINE;
-                }
-                catch(...)
-                {
-                    Fail();
-                    MTEST_LOG << EConsoleColor::Red << "[Exception]: Unknown" << EConsoleColor::Default << MTEST_NEW_LINE;
+                    Fixture->Cleanup();
                 }
                 //
-                if( !IsFailed() )
-                {
-                    MTEST_LOG << EConsoleColor::Green << "[Test]: " << Name << " - Passed" << EConsoleColor::Default << MTEST_NEW_LINE;
-                }
-                else
-                {
-                    if( !ChecksFailed )
-                    {
-                        MTEST_LOG << EConsoleColor::Red << "[Test]: " << Name << " - Failed" << EConsoleColor::Default << MTEST_NEW_LINE;
-                    }
-                    else
-                    {
-                        MTEST_LOG << EConsoleColor::Red << "[Test]: " << Name << " - Failed, Failed Checks - " << ChecksFailed << EConsoleColor::Default << MTEST_NEW_LINE;
-                    }
-                }
-                //
-                Fixture->Cleanup();
-            }
-
-            void OnCheckFail()
-            {
-                if( !Failed )
-                {
-                    Fail();
-                }
-                ++ChecksFailed;
-            }
-
-            const std::string& GetSection() const
-            {
-                return Section;
-            }
-
-            const std::string& GetName() const
-            {
-                return Name;
-            }
-
-            const std::string& GetFile() const
-            {
-                return File;
-            }
-
-            std::string GetDisplayString() const
-            {
-                return MakeDisplayString(Section, Name);
-            }
-
-            int GetLine() const
-            {
-                return Line;
-            }
-
-            bool IsFailed() const
-            {
-                return Failed;
-            }
-
-            static std::string MakeDisplayString(const std::string& section, const std::string& name)
-            {
-                return section + "::" + name;
+                PrintTestResult();
             }
         private:
-            void Fail()
-            {
-                Failed = true;
-            }
-        private:
-            std::string Section;
-            std::string Name;
-            std::string File;
-            int Line;
             FixturePtr Fixture;
             UnitTestCallback Func;
-            int ChecksFailed = 0;
-            bool Failed = false;
         };
     public:
         static CTestManager& Instance()
@@ -441,113 +715,56 @@ namespace MTest
             return Manager;
         }
 
-        CUnitTest* GetActiveUnitTest() const { return ActiveUnitTest; }
-
-        void Add(const std::string& Section, const std::string& Name, const std::string& File, const int Line, UnitTestInfoPair&& infoPair)
+        template<class F>
+        static UnitTestInfoPair CreateUnitTestInfoPair(F func)
         {
-            auto& SectionContainer = Sections[Section];
-
-            auto It = std::find_if(SectionContainer.begin(), SectionContainer.end(), [&](const std::unique_ptr<CUnitTest>& Other) {
-                return Other->GetName() == Name;
-            });
-
-            if( It != SectionContainer.end() )
-            {
-                MTEST_LOG << EConsoleColor::Red << "[Error]: Test: " << CUnitTest::MakeDisplayString(Section, Name) << " Already Exists"
-                    << EConsoleColor::Default << MTEST_NEW_LINE;
-                return;
-            }
-
-            SectionContainer.emplace_back( std::make_unique<CUnitTest>(Section, Name, File, Line, std::forward<UnitTestInfoPair>(infoPair) ) );
+            return { FixturePtr{}, UnitTestCallback{func} };
         }
 
-        void Run()
-        {
-            int UnitTestCount = 0;
-            for(const auto& i: Sections)
-            {
-                UnitTestCount += i.second.size();
-            }
-            MTEST_LOG << EConsoleColor::Blue << "[Tests]: Count: " << UnitTestCount << EConsoleColor::Default << MTEST_NEW_LINE;
-
-            for(const auto& i: Sections)
-            {
-                MTEST_LOG << MTEST_NEW_LINE;
-                MTEST_LOG << EConsoleColor::Blue << "--------------------------------" << MTEST_NEW_LINE;
-                MTEST_LOG << EConsoleColor::Blue << "[Section]: " << i.first << EConsoleColor::Default << MTEST_NEW_LINE;
-                for(const auto& j: i.second)
-                {
-                    ActiveUnitTest = j.get();
-                    j->Run();
-                    ActiveUnitTest = nullptr;
-
-                    if( j->IsFailed() )
-                    {
-                        FailedUnitTest.push_back( j.get() );
-                    }
-                }
-                MTEST_LOG << EConsoleColor::Blue << "--------------------------------" << MTEST_NEW_LINE;
-            }
-            MTEST_LOG << MTEST_NEW_LINE;
-            if( FailedUnitTest.size() )
-            {
-                MTEST_LOG << EConsoleColor::Red << "[Tests]: Failed Unit Tests: " << FailedUnitTest.size() << EConsoleColor::Default << MTEST_NEW_LINE;
-                for(const auto& i: FailedUnitTest)
-                {
-                    MTEST_LOG << EConsoleColor::Red << "[Test]: " << i->GetDisplayString() << ", File: " <<
-                        Detail::GetFileName(i->GetFile()) << ", Line: " << i->GetLine() << EConsoleColor::Default << MTEST_NEW_LINE;
-                }
-            }
-            else
-            {
-                MTEST_LOG << EConsoleColor::Green << "[Tests]: All Passed" << EConsoleColor::Default << MTEST_NEW_LINE;
-            }
-        }
-
-        CTestManager(const CTestManager&) = delete;
-        CTestManager(CTestManager&&) = delete;
-        CTestManager& operator=(const CTestManager&) = delete;
-        CTestManager& operator=(CTestManager&&) = delete;
-    private:
-        CTestManager()
-        {
-            #ifdef MTEST_WINDOWS_PLATFORM
-            GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-            #endif // MTEST_WINDOWS_PLATFORM
-        }
-
-        ~CTestManager()
-        {
-            #ifdef MTEST_WINDOWS_PLATFORM
-            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), csbi.wAttributes);
-            #endif // MTEST_WINDOWS_PLATFORM
-        }
-    private:
-        std::unordered_map<std::string, std::vector<std::unique_ptr<CUnitTest>>> Sections;
-        std::vector<CUnitTest*> FailedUnitTest;
-        CUnitTest* ActiveUnitTest = nullptr;
-        #ifdef MTEST_WINDOWS_PLATFORM
-        CONSOLE_SCREEN_BUFFER_INFO csbi;
-        #endif // MTEST_WINDOWS_PLATFORM
-    };
-
-    namespace Detail
-    {
         template<class C, class F>
-        UnitTestInfoPair CreateUnitTestInfoPair(F func)
+        static UnitTestInfoPair CreateUnitTestFixtureInfoPair(F func)
         {
             static_assert(std::is_base_of<IFixture, C>::value, "Must be base of IFixture");
             std::unique_ptr<C> fixture = std::make_unique<C>();
             UnitTestCallback callback = std::bind(func, fixture.get());
             return {std::move(fixture), callback};
         }
-    }
+
+        void Run()
+        {
+            PrintStart();
+            MTEST_LOG << MTEST_NEW_LINE;
+            for(const auto& i: Sections)
+            {
+                PrintSectionInfo(i.first);
+                for(const auto& j: i.second)
+                {
+                    if( CUnitTest* testCase = dynamic_cast<CUnitTest*>(j.get()); testCase != nullptr )
+                    {
+                        ActiveCase = testCase;
+                        testCase->Run();
+                        ActiveCase = nullptr;
+                        //
+                        UpdateCaseStatus( testCase );
+                    }
+                }
+                PrintSectionInfo(i.first);
+                MTEST_LOG << MTEST_NEW_LINE;
+            }
+            PrintSummary();
+            //
+            Clear();
+        }
+    private:
+        CTestManager() = default;
+        ~CTestManager()  = default;
+    };
 
     struct STestProxy
     {
-        STestProxy(const std::string& Section, const std::string& Name, const std::string& File, const int Line, UnitTestInfoPair&& infoPair)
+        STestProxy(const std::string& Section, const std::string& Name, const std::source_location& location, UnitTestInfoPair&& infoPair)
         {
-            CTestManager::Instance().Add( Section, Name, File, Line, std::forward<UnitTestInfoPair>(infoPair) );
+            CTestManager::Instance().Add<CTestManager::CUnitTest>( Section, Name, location, std::forward<UnitTestInfoPair>(infoPair) );
         }
     };
 }

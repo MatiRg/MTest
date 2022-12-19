@@ -6,7 +6,7 @@ if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 	message(FATAL_ERROR "In-source builds are not permitted.")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -28,7 +28,7 @@ set(SOURCES_EXAMPLES
 add_executable(Example ${SOURCES_EXAMPLES})
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang|GNU")
-    target_compile_options(Example PRIVATE -Wall -Wextra -Wunreachable-code -Wpedantic)
+    target_compile_options(Example PRIVATE -Wall -Wextra -Wunreachable-code -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-cast-function-type)
 endif()
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     target_compile_options(Example PRIVATE -Wweak-vtables -Wexit-time-destructors -Wglobal-constructors -Wmissing-noreturn)
