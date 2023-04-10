@@ -93,7 +93,7 @@ MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, CMathOperationsFixture)
 {
     int b = 3;
-    MTEST_ASSERT(MyField == 6);
+    MTEST_ASSERT_VALUE(MyField, 6);
     int* Tmp = &b;
     MTEST_ASSERT_NOT_NULL(Tmp);
     MTEST_ASSERT( MyField != *Tmp );
@@ -107,7 +107,7 @@ MTEST_MAIN
 int main(int, char*[])
 {
     // Some logic here
-    MTest::CLog::Instance().AddWriter<MTest::CStdWriter>();
+    MTEST_IMPLEMENT_STD_LOGGER;
     MTEST_IMPLEMENT_MAIN; //! Will run test application.
     // ... and some logic here
 	return 0;

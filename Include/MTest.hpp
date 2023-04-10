@@ -86,6 +86,12 @@ SOFTWARE.
 //! It must evaluate to true statement, if not test will fail but will continue execution.
 #define MTEST_CHECK_NOT_NULL(Value) MTEST_CHECK(Value != nullptr)
 
+//! It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_VALUE(Value, Wanted) MTEST_CHECK(Value == Wanted)
+
+//! It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_NOT_VALUE(Value, Wanted) MTEST_CHECK(Value != Wanted)
+
 //! Must evaluate to true statement, if not test will fail and will exit.
 #define MTEST_ASSERT_TRUE(Cond) MTest::ITestManager::GetActiveCase()->Assert( #Cond , (Cond) )
 
@@ -100,6 +106,12 @@ SOFTWARE.
 
 //! Must evaluate to true statement, if not test will fail and will exit.
 #define MTEST_ASSERT_NOT_NULL(Value) MTEST_ASSERT(Value != nullptr)
+
+//! Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_VALUE(Value, Wanted) MTEST_ASSERT(Value == Wanted)
+
+//! Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_NOT_VALUE(Value, Wanted) MTEST_ASSERT(Value != Wanted)
 
 //
 
@@ -133,15 +145,12 @@ void MTest:: MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name)()
 
 //! Define test case, give section name and test case name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) \
-namespace MTest \
-{ \
-    void MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)(); \
-    STestProxy ut##Section##Name##Inst( #Section, #Name , std::source_location::current() , \
-        CTestManager::CreateUnitTestInfoPair( &MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) ) ); \
-} \
-void MTest:: MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)()
+#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, IFixture)
 
+//! Add STD Logger
+#define MTEST_IMPLEMENT_STD_LOGGER MTest::CLog::Instance().AddWriter<MTest::CStdWriter>()
+//! Add File Logger
+#define MTEST_IMPLEMENT_FILE_LOGGER(File) MTest::CLog::Instance().AddWriter<MTest::CFileWriter>( File )
 //! Use to launch unit test application.
 #define MTEST_IMPLEMENT_MAIN MTest::CTestManager::Instance().Run()
 
@@ -149,7 +158,7 @@ void MTest:: MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name)()
 #define MTEST_MAIN \
 int main(int, char*[]) \
 { \
-    MTest::CLog::Instance().AddWriter<MTest::CStdWriter>(); \
+    MTEST_IMPLEMENT_STD_LOGGER; \
     MTEST_IMPLEMENT_MAIN; \
 	return 0; \
 }
@@ -713,12 +722,6 @@ namespace MTest
         {
             static CTestManager Manager;
             return Manager;
-        }
-
-        template<class F>
-        static UnitTestInfoPair CreateUnitTestInfoPair(F func)
-        {
-            return { FixturePtr{}, UnitTestCallback{func} };
         }
 
         template<class C, class F>
