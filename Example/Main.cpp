@@ -28,7 +28,7 @@ SOFTWARE.
 MTEST_UNIT_TEST(Basic, Hello)
 {
     //! Print some information to stdout. 
-    MTEST_INFO( "Hello World" );
+    MTEST_INFO("Hello World\n");
     int a = 7;
     //! It must evaluate to true statement, if not test will fail but will continue execution.
     MTEST_CHECK(a == 7);
@@ -61,18 +61,18 @@ MTEST_UNIT_TEST(Other, MathFail)
 class CMathOperationsFixture: public MTest::IFixture
 {
 public:
-    //! Can be used to init some data. Return false if something goes wrong.
-    bool Setup() override
+    //! Can be used to init some data. Use Assertions to check state.
+    void Setup() override
     {
-        MTEST_LOG << "Setup User Data" << MTEST_NEW_LINE;
+        MTEST_INFO("Setup User Data\n");
         MyField = 6;
-        return true;
+        MTEST_ASSERT_VALUE(MyField, 6);
     }
 
     //! Perform cleanup if needed.
     void Cleanup() override
     {
-        MTEST_LOG << "Cleanup User Data" << MTEST_NEW_LINE;
+        MTEST_INFO("Cleanup User Data\n");
     }
 protected:
     //! Fields, Methods can be accessed in test case unless they are marked private.
@@ -85,7 +85,7 @@ MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 {
     MTEST_ASSERT(MyField == 6);
     int* Tmp = nullptr;
-    MTEST_LOG << "Checking for NULL" << MTEST_NEW_LINE;
+    MTEST_INFO("Checking for NULL\n");
     MTEST_ASSERT_NULL(Tmp);
 }
 
@@ -97,6 +97,33 @@ MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, CMathOperationsFixture)
     int* Tmp = &b;
     MTEST_ASSERT_NOT_NULL(Tmp);
     MTEST_ASSERT( MyField != *Tmp );
+}
+
+//! Test case skip example
+MTEST_UNIT_TEST(SimpleSkip, ShowSkip1)
+{
+    MTEST_SKIP("Not Support on this PC");
+    //
+    int b = 3;
+    MTEST_ASSERT(b == 3);
+}
+
+//! Use fixture for this skip
+class CAdvancedSkipFixture: public MTest::IFixture
+{
+public:
+    bool Skip() override
+    {
+        //! Return true if must skip these tests
+        return true; 
+    }
+};
+
+//! Test case skip with Fixture example
+MTEST_UNIT_TEST_F(AdvancedSkip, ShowSkip2)
+{
+    int b = 3;
+    MTEST_ASSERT(b == 3);
 }
 
 //! Implements main() function

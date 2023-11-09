@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2022 Mateusz Rugor
+Copyright (c) 2023 Mateusz Rugor
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -40,18 +40,9 @@ SOFTWARE.
 #include <concepts>
 #include <fstream>
 
-// _WIN64   - 64 bit
-// _WIN32   - 32 i 64 bit
-// _M_X64   - x64 Visual Studio
-// __CYGWIN__   - Windows with Cygwin (POSIX)
-//#if defined(__WIN32__) || defined(WIN32) || defined(_WIN32) || defined(__CYGWIN__) || defined(__MINGW32__)
-// __linux__     - Linux kernel
-// __x86_64__    - x64 GNUC
-//#elif defined(__LINUX__) || defined(linux) || defined(__linux) || defined(__linux__)
-
-#if defined(_WIN64) || defined(_WIN32)
+#if defined(_WIN64) || defined(_WIN32) || defined(WIN32)
     #define MTEST_WINDOWS_PLATFORM 1
-#elif defined(__linux__) || defined(linux)
+#elif defined(__linux__) || defined(__linux) || defined(linux)
     #define MTEST_LINUX_PLATFORM 1
 #else
     #error "Unsupported platform"
@@ -62,14 +53,7 @@ SOFTWARE.
     #include <windows.h>
 #endif // MTEST_WINDOWS_PLATFORM
 
-// Macros for output
-#ifndef MTEST_LOG
-#define MTEST_LOG MTest::CLog::Instance()
-#endif // MTEST_LOG
-
-#ifndef MTEST_NEW_LINE
-#define MTEST_NEW_LINE "\n"
-#endif // MTEST_NEW_LINE
+//// Assertions
 
 //! It must evaluate to true statement, if not test will fail but will continue execution.
 #define MTEST_CHECK_TRUE(Cond) MTest::ITestManager::GetActiveCase()->Check( #Cond , (Cond) )
@@ -113,10 +97,15 @@ SOFTWARE.
 //! Must evaluate to true statement, if not test will fail and will exit.
 #define MTEST_ASSERT_NOT_VALUE(Value, Wanted) MTEST_ASSERT(Value != Wanted)
 
-//
+//// Logs & Utility
+
+//! Skip test
+#define MTEST_SKIP(Reason) MTest::ITestManager::GetActiveCase()->Skip( Reason )
 
 //! Print some information to stdout.
-#define MTEST_INFO(Msg) MTEST_LOG << MTest::EConsoleColor::Default << "[Message] " << Msg << MTEST_NEW_LINE
+#define MTEST_INFO(Msg) MTest::CLog::Instance() << MTest::EConsoleColor::Default << "[Message] " << Msg
+
+//// Test Setup
 
 // For No Fixture Tests
 #define MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) Section##Name##TestFunction
@@ -171,25 +160,27 @@ namespace MTest
         Red,
         Yellow,
         Green,
-        Blue
+        Blue,
+        Magenta
     };
 
     namespace Detail
     {
         inline std::string GetFileName(const std::string& Path)
         {
-            const auto Pos = Path.find_last_of( "\\/" );
+            const auto Pos = Path.find_last_of("\\/");
             if( Pos == std::string::npos )
             {
                 return Path;
             }
             else
             {
-                return Path.substr( Pos+1 );
+                return Path.substr(Pos+1u);
             }
         }
 
         #ifdef MTEST_WINDOWS_PLATFORM
+        // https://learn.microsoft.com/en-us/dotnet/api/system.consolecolor?view=net-7.0
         inline int ToWin32Color(const EConsoleColor x)
         {
             switch(x)
@@ -202,12 +193,16 @@ namespace MTest
                 return 10;
             case EConsoleColor::Blue:
                 return 9;
+            case EConsoleColor::Magenta:
+                return 13;
             case EConsoleColor::Default:
+                [[fallthrough]];
             default:
-                return 15;
+                return 7;
             }
         }
         #else
+        // https://www.codeproject.com/Tips/5255355/How-to-Put-Color-on-Windows-Console
         inline std::string ToAnsiColor(const EConsoleColor x)
         {
             switch(x)
@@ -220,7 +215,10 @@ namespace MTest
                 return "\033[32m";
             case EConsoleColor::Blue:
                 return "\033[34m";
+            case EConsoleColor::Magenta:
+                return "\033[35m";
             case EConsoleColor::Default:
+                [[fallthrough]];
             default:
                 return "\033[0m";
             }
@@ -324,24 +322,23 @@ namespace MTest
         template<class T>
         CLog& operator<<(const T& Value)
         {
-            // Reuse
-            static std::ostringstream stream;
             for(const auto& i: Writers)
             {
-                stream << Value;
-                i->Write( stream.str() );
-                stream.str("");
-                stream.clear();
+                Stream << Value;
+                i->Write(Stream.str());
+                Stream.str({});
+                Stream.clear();
             }
             return *this;
         }
     private:
         std::vector<std::unique_ptr<IWriter>> Writers;
+        std::ostringstream Stream;
     };
 
-    struct SFailInfo
+    struct SCheckInfo
     {
-        SFailInfo(const bool isAssert, const std::string& condition, const std::source_location& location):
+        SCheckInfo(const bool isAssert, const std::string& condition, const std::source_location& location):
             IsAssert(isAssert),
             Condition(condition),
             File(Detail::GetFileName(location.file_name())),
@@ -369,7 +366,7 @@ namespace MTest
         std::uint_least32_t Line;
     };
 
-    inline std::ostream& operator<<(std::ostream& Stream, const SFailInfo& Info)
+    inline std::ostream& operator<<(std::ostream& Stream, const SCheckInfo& Info)
     {
         Stream << Info.ToString();
         return Stream;
@@ -384,6 +381,15 @@ namespace MTest
         }
     };
 
+    class CTestSkippedException: public std::logic_error
+    {
+    public:
+        CTestSkippedException():
+            std::logic_error("Test Skipped")
+        {
+        }
+    };
+
     //! Can be used to init some data before each test. Test function has access to its internals (excluding private).
     class IFixture
     {
@@ -391,8 +397,10 @@ namespace MTest
         IFixture() = default;
         virtual ~IFixture() = default;
 
-        //! Should return false if something bad happens.
-        virtual bool Setup() { return true; }
+        //! Should return true if test case should be skipped.
+        virtual bool Skip() { return false; }
+        //! Use Assertions to check state.
+        virtual void Setup() {}
         //! Cleanup if needed.
         virtual void Cleanup() {}
     };
@@ -404,14 +412,15 @@ namespace MTest
     class ITestCase
     {
     public:
-        ITestCase(const std::string& section, const std::string& name, const std::source_location& location):
+        ITestCase(const std::string& section, const std::string& name, const std::source_location& location, UnitTestInfoPair&& infoPair):
             Section(section),
-            Name( name ),
-            File( Detail::GetFileName(location.file_name()) ),
-            Line( location.line() )
+            Name(name),
+            File(Detail::GetFileName(location.file_name())),
+            Line(location.line()),
+            Fixture(std::move(infoPair.first)),
+            Func(std::move(infoPair.second))
         {
         }
-
         virtual ~ITestCase() = default;
 
         ITestCase(const ITestCase&) = delete;
@@ -420,47 +429,20 @@ namespace MTest
         ITestCase(ITestCase&&) = default;
         ITestCase& operator=(ITestCase&&) = default;
 
-        const std::string& GetSection() const
-        {
-            return Section;
-        }
+        virtual void Run() = 0;
 
-        const std::string& GetName() const
-        {
-            return Name;
-        }
+        const std::string& GetSection() const { return Section; }
+        const std::string& GetName() const { return Name; }
+        const std::string& GetFile() const { return File; }
+        std::uint_least32_t GetLine() const { return Line; }
+        bool IsFailed() const { return Failed; }
+        const std::vector<SCheckInfo>& GetFailedChecks() const { return FailedChecks; }
+        const std::optional<SCheckInfo>& GetFailedAssertion() const { return FailedAssertion; }
+        IFixture* GetFixture() const { return Fixture.get(); }
+        bool IsSkipped() const { return Skipped; }
 
-        const std::string& GetFile() const
-        {
-            return File;
-        }
-
-        std::uint_least32_t GetLine() const
-        {
-            return Line;
-        }
-
-        bool IsFailed() const
-        {
-            return Failed;
-        }
-
-        const std::vector<SFailInfo>& GetFailedChecks() const
-        {
-            return FailedChecks;
-        }
-
-        const std::optional<SFailInfo>& GetFailedAssertion() const
-        {
-            return FailedAssertion;
-        }
-
-        std::string GetDisplayString() const
-        {
-            return MakeDisplayString(Section, Name);
-        }
-
-        static std::string MakeDisplayString(const std::string& section, const std::string& name)
+        std::string GetDisplayString() const { return MakeDisplayString(Section, Name); }
+        static std::string MakeDisplayString(const std::string& section, const std::string& name) 
         {
             return section + "." + name;
         }
@@ -470,9 +452,9 @@ namespace MTest
         {
             if( !IsSuccess )
             {
-                Fail();
-                FailedChecks.push_back( SFailInfo{false, Condition, Location} );
-                MTEST_LOG << MTest::EConsoleColor::Yellow << FailedChecks.back() << MTest::EConsoleColor::Default << MTEST_NEW_LINE;
+                MarkFailed();
+                FailedChecks.push_back( SCheckInfo{false, Condition, Location} );
+                CLog::Instance() << MTest::EConsoleColor::Yellow << FailedChecks.back() << MTest::EConsoleColor::Default << "\n";
                 return false;
             }
             return true;
@@ -482,39 +464,55 @@ namespace MTest
         {
             if( !IsSuccess )
             {
-                Fail();
-                FailedAssertion = SFailInfo{true, Condition, Location};
-                MTEST_LOG << EConsoleColor::Red << FailedAssertion.value() << EConsoleColor::Default << MTEST_NEW_LINE;
-                throw CTestAbortedException();
+                MarkFailed();
+                FailedAssertion = SCheckInfo{true, Condition, Location};
+                CLog::Instance() << EConsoleColor::Red << FailedAssertion.value() << EConsoleColor::Default << "\n";
+                throw CTestAbortedException{};
             }
+        }
+
+        void Skip(const std::string& Reason)
+        {
+            MarkSkipped();
+            CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << Reason << EConsoleColor::Default << "\n";
+            throw CTestSkippedException{};
         }
 
         void OnException(const std::string& What)
         {
-            Fail();
-            MTEST_LOG << EConsoleColor::Red << "[Failure] " << What << EConsoleColor::Default << MTEST_NEW_LINE;
+            MarkFailed();
+            CLog::Instance() << EConsoleColor::Red << "[Failure] " << What << EConsoleColor::Default << "\n";
         }
 
         void PrintTestInfo()
         {
-            MTEST_LOG << EConsoleColor::Blue << "[ Start ] " << GetDisplayString() << EConsoleColor::Default << MTEST_NEW_LINE;
+            CLog::Instance() << EConsoleColor::Blue << "[ Start ] " << GetDisplayString() << EConsoleColor::Default << "\n";
         }
 
         void PrintTestResult()
         {
-            if( !IsFailed() )
+            if( IsFailed() )
             {
-                MTEST_LOG << EConsoleColor::Green << "[Success] " << GetDisplayString() << EConsoleColor::Default << MTEST_NEW_LINE;
+                CLog::Instance() << EConsoleColor::Red << "[Failure] " << GetDisplayString() << EConsoleColor::Default << "\n";
+            }
+            else if( IsSkipped() )
+            {
+                CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << GetDisplayString() << EConsoleColor::Default << "\n";
             }
             else
             {
-                MTEST_LOG << EConsoleColor::Red << "[Failure] " << GetDisplayString() << EConsoleColor::Default << MTEST_NEW_LINE;
+                CLog::Instance() << EConsoleColor::Green << "[Success] " << GetDisplayString() << EConsoleColor::Default << "\n";
             }
         }
     protected:
-        void Fail()
+        void MarkFailed()
         {
             Failed = true;
+        }
+
+        void MarkSkipped()
+        {
+            Skipped = true;
         }
 
         template<class F>
@@ -524,16 +522,15 @@ namespace MTest
             {
                 Callback();
             }
-            catch(const CTestAbortedException&) // Do Nothing
-            {
-            }
+            catch(const CTestAbortedException&) {}
+            catch(const CTestSkippedException&) {}
             catch(const std::exception& Exception)
             {
-                OnException( Exception.what() );
+                OnException(Exception.what());
             }
             catch(...)
             {
-                OnException( "Unknown" );
+                OnException("Unknown");
             }
         }
     protected:
@@ -541,9 +538,12 @@ namespace MTest
         std::string Name;
         std::string File;
         std::uint_least32_t Line;
-        std::vector<SFailInfo> FailedChecks;
-        std::optional<SFailInfo> FailedAssertion;
+        std::vector<SCheckInfo> FailedChecks;
+        std::optional<SCheckInfo> FailedAssertion;
         bool Failed = false;
+        FixturePtr Fixture;
+        UnitTestCallback Func;
+        bool Skipped = false;
     };
 
     //! Common Functionality that can be used to implement eg. Integration Tests
@@ -581,11 +581,17 @@ namespace MTest
             });
             if( It != SectionContainer.end() )
             {
-                MTEST_LOG << EConsoleColor::Red << "[ Error ] " << ITestCase::MakeDisplayString(Section, Name) << " Already Exists"
-                    << EConsoleColor::Default << MTEST_NEW_LINE;
+                CLog::Instance() << EConsoleColor::Red << "[ Error ] " << ITestCase::MakeDisplayString(Section, Name) << " Already Exists"
+                    << EConsoleColor::Default << "\n";
                 return;
             }
-            SectionContainer.emplace_back( std::make_unique<T>( Section, Name, location, std::forward<Args>(args)... ) );
+            auto tmp = std::make_unique<T>(Section, Name, location, std::forward<Args>(args)...);
+            if( !tmp->GetFixture() )
+            {
+                CLog::Instance() << EConsoleColor::Red << "[ Error ] Invalid fixture in: " << tmp->GetDisplayString() << "\n";
+                return;
+            }
+            SectionContainer.emplace_back(std::move(tmp));
         }
 
         void UpdateCaseStatus(ITestCase* testCase)
@@ -596,14 +602,24 @@ namespace MTest
                 {
                     FailedTestCases.push_back( testCase );
                 }
+                else if( testCase->IsSkipped() )
+                {
+                    SkippedTestCases.push_back( testCase );
+                }
+                else
+                {
+                    PassedTestCases.push_back( testCase );
+                }
             }
         }
 
         void Clear()
         {
             Sections.clear();
+            PassedTestCases.clear();
             FailedTestCases.clear();
-            ActiveCase = nullptr;
+            SkippedTestCases.clear();
+            SetActiveCase(nullptr);
         }
 
         std::size_t GetSectionTestCount(const std::string& section) const
@@ -627,29 +643,41 @@ namespace MTest
             {
                 testCount += i.second.size();
             }
-            MTEST_LOG << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
-                      << Sections.size() << " sections" << EConsoleColor::Default << MTEST_NEW_LINE;
+            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
+                << Sections.size() << " sections" << EConsoleColor::Default << "\n";
         }
 
         void PrintSectionInfo(const std::string& name)
         {
-            MTEST_LOG << EConsoleColor::Blue << "[-------] Running section " << name << " which has " << GetSectionTestCount(name) << " tests" << EConsoleColor::Default << MTEST_NEW_LINE;
+            CLog::Instance() << EConsoleColor::Blue << "[-------] Running section " << name << " which has " << GetSectionTestCount(name) << " tests" 
+                << EConsoleColor::Default << "\n";
+        }
+
+        void PrintSummary(const std::vector<ITestCase*>& array, const EConsoleColor color, const std::string& description, const std::string& prefix)
+        {
+            CLog::Instance() << color << "[Manager] " << description << " Unit Tests: " << array.size() << EConsoleColor::Default << "\n";
+            for(const auto& i: array)
+            {
+                CLog::Instance() << color << prefix << i->GetDisplayString() << ", File: " <<
+                    i->GetFile() << ", Line: " << i->GetLine() << EConsoleColor::Default << "\n";
+            }
         }
 
         void PrintSummary()
         {
+            if( SkippedTestCases.size() )
+            {
+                PrintSummary(SkippedTestCases, EConsoleColor::Magenta, "Skipped", "[Skipped] ");
+            }
+            //
             if( FailedTestCases.size() )
             {
-                MTEST_LOG << EConsoleColor::Red << "[Manager] Failed Unit Tests: " << FailedTestCases.size() << EConsoleColor::Default << MTEST_NEW_LINE;
-                for(const auto& i: FailedTestCases)
-                {
-                    MTEST_LOG << EConsoleColor::Red << "[Failure] " << i->GetDisplayString() << ", File: " <<
-                        i->GetFile() << ", Line: " << i->GetLine() << EConsoleColor::Default << MTEST_NEW_LINE;
-                }
+                PrintSummary(FailedTestCases, EConsoleColor::Red, "Failed", "[Failure] ");
             }
-            else
+            //
+            if( PassedTestCases.size() )
             {
-                MTEST_LOG << EConsoleColor::Green << "[Manager] All Passed" << EConsoleColor::Default << MTEST_NEW_LINE;
+                PrintSummary(PassedTestCases, EConsoleColor::Green, "Passed", "[Success] ");
             }
         }
 
@@ -670,7 +698,9 @@ namespace MTest
         }
     protected:
         std::unordered_map<std::string, std::vector<std::unique_ptr<ITestCase>>> Sections;
+        std::vector<ITestCase*> PassedTestCases;
         std::vector<ITestCase*> FailedTestCases;
+        std::vector<ITestCase*> SkippedTestCases;
         static inline ITestCase* ActiveCase = nullptr;
     private:
         #ifdef MTEST_WINDOWS_PLATFORM
@@ -686,36 +716,29 @@ namespace MTest
         {
         public:
             CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, UnitTestInfoPair&& infoPair):
-                ITestCase(section, name, location),
-                Fixture( std::move(infoPair.first) ),
-                Func( std::move(infoPair.second) )
+                ITestCase(section, name, location, std::move(infoPair))
             {
             }
 
-            void Run()
+            void Run() override
             {
                 PrintTestInfo();
                 //
                 PassRunner([&]()
                 {
-                    if( Fixture && !Fixture->Setup() )
+                    if( Fixture->Skip() )
                     {
-                        throw std::runtime_error{"Error during fixture setup"};
+                        Skip("Test case is skipped by Fixture");
                     }
+                    Fixture->Setup();
                     //
                     Func();
                 });
                 //
-                if( Fixture )
-                {
-                    Fixture->Cleanup();
-                }
+                Fixture->Cleanup();
                 //
                 PrintTestResult();
             }
-        private:
-            FixturePtr Fixture;
-            UnitTestCallback Func;
         };
     public:
         static CTestManager& Instance()
@@ -724,10 +747,9 @@ namespace MTest
             return Manager;
         }
 
-        template<class C, class F>
+        template<std::derived_from<IFixture> C, class F>
         static UnitTestInfoPair CreateUnitTestFixtureInfoPair(F func)
         {
-            static_assert(std::is_base_of<IFixture, C>::value, "Must be base of IFixture");
             std::unique_ptr<C> fixture = std::make_unique<C>();
             UnitTestCallback callback = std::bind(func, fixture.get());
             return {std::move(fixture), callback};
@@ -736,23 +758,23 @@ namespace MTest
         void Run()
         {
             PrintStart();
-            MTEST_LOG << MTEST_NEW_LINE;
+            CLog::Instance() << "\n";
             for(const auto& i: Sections)
             {
                 PrintSectionInfo(i.first);
                 for(const auto& j: i.second)
                 {
-                    if( CUnitTest* testCase = dynamic_cast<CUnitTest*>(j.get()); testCase != nullptr )
+                    if(CUnitTest* testCase = dynamic_cast<CUnitTest*>(j.get()); testCase != nullptr)
                     {
-                        ActiveCase = testCase;
+                        SetActiveCase(testCase);
                         testCase->Run();
-                        ActiveCase = nullptr;
+                        SetActiveCase(nullptr);
                         //
-                        UpdateCaseStatus( testCase );
+                        UpdateCaseStatus(testCase);
                     }
                 }
                 PrintSectionInfo(i.first);
-                MTEST_LOG << MTEST_NEW_LINE;
+                CLog::Instance() << "\n";
             }
             PrintSummary();
             //
@@ -767,7 +789,7 @@ namespace MTest
     {
         STestProxy(const std::string& Section, const std::string& Name, const std::source_location& location, UnitTestInfoPair&& infoPair)
         {
-            CTestManager::Instance().Add<CTestManager::CUnitTest>( Section, Name, location, std::forward<UnitTestInfoPair>(infoPair) );
+            CTestManager::Instance().Add<CTestManager::CUnitTest>( Section, Name, location, std::move(infoPair) );
         }
     };
 }
