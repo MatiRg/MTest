@@ -1,9 +1,10 @@
 # MTest 
 MTest is small, quick and dirty, header-only C++20 Unit Test library inspired by Catch2 nad gtest.
 ## Example console output
-![alt text](ConsoleOutput.JPG "Example console (PowerShell) output.") 
+![alt text](Output.png "Example console (PowerShell) output.") 
 ## Installing
 Copy MTest.hpp to your source dir.
+Include header and you are good to go.
 ## Example
 ```C++
 #include "MTest.hpp"
@@ -13,7 +14,7 @@ Copy MTest.hpp to your source dir.
 MTEST_UNIT_TEST(Basic, Hello)
 {
     //! Print some information to stdout. 
-    MTEST_INFO("Hello World\n");
+    MTEST_INFO("Hello World");
     int a = 7;
     //! It must evaluate to true statement, if not test will fail but will continue execution.
     MTEST_CHECK(a == 7);
@@ -49,7 +50,7 @@ public:
     //! Can be used to init some data. Use Assertions to check state.
     void Setup() override
     {
-        MTEST_INFO("Setup User Data\n");
+        MTEST_INFO("Setup User Data");
         MyField = 6;
         MTEST_ASSERT_VALUE(MyField, 6);
     }
@@ -57,7 +58,7 @@ public:
     //! Perform cleanup if needed.
     void Cleanup() override
     {
-        MTEST_INFO("Cleanup User Data\n");
+        MTEST_INFO("Cleanup User Data");
     }
 protected:
     //! Fields, Methods can be accessed in test case unless they are marked private.
@@ -70,7 +71,7 @@ MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 {
     MTEST_ASSERT(MyField == 6);
     int* Tmp = nullptr;
-    MTEST_INFO("Checking for NULL\n");
+    MTEST_INFO("Checking for NULL");
     MTEST_ASSERT_NULL(Tmp);
 }
 
@@ -109,6 +110,15 @@ MTEST_UNIT_TEST_F(AdvancedSkip, ShowSkip2)
 {
     int b = 3;
     MTEST_ASSERT(b == 3);
+}
+
+//! Test case with uncaught exception
+MTEST_UNIT_TEST(Exceptions, Uncaught)
+{
+    throw std::runtime_error{"Some exception"};
+    //
+    bool flag = false;
+    MTEST_ASSERT_FALSE(flag);
 }
 
 //! Implements main() function
