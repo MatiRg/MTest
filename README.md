@@ -44,9 +44,8 @@ MTEST_UNIT_TEST(Other, MathFail)
 }
 
 //! Create fixture. Fixture is created everytime when test case is run.
-class CMathOperationsFixture: public MTest::IFixture
+struct MathOperationsFixture: public MTest::Fixture
 {
-public:
     //! Can be used to init some data. Use Assertions to check state.
     void Setup() override
     {
@@ -66,7 +65,7 @@ protected:
 };
 
 //! Create test case with user fixture.
-//! Fixture name is created as follows: 'C' + MathOperations + 'Fixture'
+//! Fixture name is created as follows: MathOperations + 'Fixture'
 MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 {
     MTEST_ASSERT(MyField == 6);
@@ -76,7 +75,7 @@ MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 }
 
 //! Similar as above
-MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, CMathOperationsFixture)
+MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, MathOperationsFixture)
 {
     int b = 3;
     MTEST_ASSERT_VALUE(MyField, 6);
@@ -95,9 +94,8 @@ MTEST_UNIT_TEST(SimpleSkip, ShowSkip1)
 }
 
 //! Use fixture for this skip
-class CAdvancedSkipFixture: public MTest::IFixture
+struct AdvancedSkipFixture: public MTest::Fixture
 {
-public:
     bool Skip() override
     {
         //! Return true if must skip these tests

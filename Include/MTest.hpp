@@ -39,6 +39,8 @@ SOFTWARE.
 #include <optional>
 #include <concepts>
 #include <fstream>
+#include <chrono>
+#include <numeric>
 
 #if defined(_WIN64) || defined(_WIN32) || defined(WIN32)
     #define MTEST_WINDOWS_PLATFORM 1
@@ -52,6 +54,12 @@ SOFTWARE.
     #define WIN32_LEAN_AND_MEAN
     #include <windows.h>
 #endif // MTEST_WINDOWS_PLATFORM
+
+//// Utils
+
+#define MTEST_DETAIL_MACRO_CONCAT(x, y) x##y
+//! Needed because __LINE__ or __COUNTER__ itself is a macro so it needs two level expanding.
+#define MTEST_MACRO_CONCAT(x, y) MTEST_DETAIL_MACRO_CONCAT(x, y)
 
 //// Assertions
 
@@ -102,34 +110,40 @@ SOFTWARE.
 
 //// Test Setup
 
-// For No Fixture Tests
-#define MTEST_DETAIL_GENERATE_TEST_NAME(Section, Name) Section##Name##TestFunction
-#define MTEST_DETAIL_GENERATE_TEST_NAME_FIXTURE(Section, Name) Section##Name##TestMethod
-#define MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) CFixtureImpl##Section##Name
-#define MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name) MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) :: MTEST_DETAIL_GENERATE_TEST_NAME_FIXTURE(Section, Name)
+#define MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, ConcreteFixture) \
+namespace MTest::Internal \
+{ \
+    struct ConcreteFixture final : public ParentFixture \
+    { \
+        void MTest_TestMethod(); \
+    }; \
+    SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
+    { \
+        []() \
+        { \
+            auto fixture = std::make_unique<ConcreteFixture>(); \
+            TestCallback callback = std::bind(&ConcreteFixture::MTest_TestMethod, fixture.get()); \
+            CTestManager::Instance().Add<CTestManager::CUnitTest> \
+            ( \
+                #Section, #Name, std::source_location::current(), \
+                std::move(callback), std::move(fixture) \
+            ); \
+        } \
+    }; \
+} \
+void MTest::Internal::ConcreteFixture::MTest_TestMethod()
 
 //! Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST_FX(Section, Name, Fixture) \
-namespace MTest \
-{ \
-    class MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name): public Fixture \
-    { \
-    public: \
-        void MTEST_DETAIL_GENERATE_TEST_NAME_FIXTURE(Section, Name)(); \
-    }; \
-    STestProxy ut##Section##Name##Inst( #Section , #Name , std::source_location::current() , \
-        CTestManager::CreateUnitTestFixtureInfoPair< MTEST_DETAIL_GENERATE_TEST_FIXTURE_NAME(Section, Name) >( &MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name) ) ); \
-} \
-void MTest:: MTEST_DETAIL_GENERATE_TEST_FIXTURE_FULL_NAME(Section, Name)()
+#define MTEST_UNIT_TEST_FX(Section, Name, ParentFixture) MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-//! Define test case, give section name, test case name. Fixture name is deffered from section name eg. C + 'Section Name' + Fixture
+//! Define test case, give section name, test case name. Fixture name is deffered from section name eg. 'Section' + Fixture
 //! Tests are executed by section, test case name must be unique in given section.
-#define MTEST_UNIT_TEST_F(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, C##Section##Fixture )
+#define MTEST_UNIT_TEST_F(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, Section##Fixture )
 
 //! Define test case, give section name and test case name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, IFixture)
+#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, Fixture)
 
 //! Add STD Logger
 #define MTEST_IMPLEMENT_STD_LOGGER MTest::CLog::Instance().AddWriter<MTest::CStdWriter>()
@@ -159,7 +173,7 @@ namespace MTest
         Magenta
     };
 
-    namespace Detail
+    namespace Details
     {
         inline std::string GetFileName(const std::string& Path)
         {
@@ -172,6 +186,17 @@ namespace MTest
             {
                 return Path.substr(Pos+1u);
             }
+        }
+
+        inline std::string FormatTime(const float timeInMS)
+        {
+            const bool toSeconds = timeInMS >= 100.0f;
+            std::ostringstream Stream;
+            Stream << "(";
+            Stream << (toSeconds ? timeInMS/1000.0f : timeInMS);
+            Stream << (toSeconds ? " s" : " ms");
+            Stream << ")";
+            return Stream.str();
         }
 
         #ifdef MTEST_WINDOWS_PLATFORM
@@ -224,9 +249,9 @@ namespace MTest
     inline std::ostream& operator<<(std::ostream& Stream, const EConsoleColor x)
     {
         #ifdef MTEST_WINDOWS_PLATFORM
-        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Detail::ToWin32Color(x));
+        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Details::ToWin32Color(x));
         #else
-        Stream << Detail::ToAnsiColor(x);
+        Stream << Details::ToAnsiColor(x);
         #endif // MTEST_WINDOWS_PLATFORM
         return Stream;
     }
@@ -336,7 +361,7 @@ namespace MTest
         SCheckInfo(const bool isAssert, const std::string& condition, const std::source_location& location):
             IsAssert(isAssert),
             Condition(condition),
-            File(Detail::GetFileName(location.file_name())),
+            File(Details::GetFileName(location.file_name())),
             Line(location.line())
         {
         }
@@ -366,11 +391,11 @@ namespace MTest
         return Stream;
     }
 
-    class CTestAbortedException: public std::logic_error
+    class CTestAssertionException: public std::logic_error
     {
     public:
-        CTestAbortedException():
-            std::logic_error("Test Aborted")
+        CTestAssertionException():
+            std::logic_error("Test Assertion")
         {
         }
     };
@@ -384,12 +409,11 @@ namespace MTest
         }
     };
 
-    //! Can be used to init some data before each test. Test function has access to its internals (excluding private).
-    class IFixture
+    //! Can be used to init some data before each test. Test function has access to its internals (excluding private) - prefer structs (public default access).
+    struct Fixture
     {
-    public:
-        IFixture() = default;
-        virtual ~IFixture() = default;
+        Fixture() = default;
+        virtual ~Fixture() = default;
 
         //! Should return true if test case should be skipped.
         virtual bool Skip() { return false; }
@@ -399,20 +423,39 @@ namespace MTest
         virtual void Cleanup() {}
     };
 
-    using FixturePtr = std::unique_ptr<IFixture>;
-    using UnitTestCallback = std::function<void()>;
-    using UnitTestInfoPair = std::pair<FixturePtr, UnitTestCallback>;
+    //! Fixture to use with Table tests.
+    template<class DataType>
+    struct TableFixture: public Fixture
+    {
+        TableFixture() = default;
+        virtual ~TableFixture() = default;
+
+        //! Get Test case name
+        virtual std::string GetTestName(const DataType&, const std::size_t i) { return std::to_string(i); }
+        //! Should return true if test case should be skipped.
+        virtual bool Skip(const DataType&, const std::size_t) { return Skip(); }
+        //! Use Assertions to check state.
+        virtual void Setup(const DataType&, const std::size_t) { Setup(); }
+        //! Cleanup if needed.
+        virtual void Cleanup(const DataType&, const std::size_t) { Cleanup(); }
+    };
+
+    using FixturePtr = std::unique_ptr<Fixture>;
+    using TestCallback = std::function<void()>;
 
     class ITestCase
     {
+        using TestClock = std::chrono::steady_clock;
+        using TestClockStamp = std::chrono::steady_clock::time_point;
+        using TestClockDuration = std::chrono::duration<float, std::milli>;
     public:
-        ITestCase(const std::string& section, const std::string& name, const std::source_location& location, UnitTestInfoPair&& infoPair):
+        ITestCase(const std::string& section, const std::string& name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture):
             Section(section),
             Name(name),
-            File(Detail::GetFileName(location.file_name())),
+            File(Details::GetFileName(location.file_name())),
             Line(location.line()),
-            Fixture(std::move(infoPair.first)),
-            Func(std::move(infoPair.second))
+            Callback(std::move(callback)),
+            Fixture(std::move(fixture))
         {
         }
         virtual ~ITestCase() = default;
@@ -432,11 +475,12 @@ namespace MTest
         bool IsFailed() const { return Failed; }
         const std::vector<SCheckInfo>& GetFailedChecks() const { return FailedChecks; }
         const std::optional<SCheckInfo>& GetFailedAssertion() const { return FailedAssertion; }
-        IFixture* GetFixture() const { return Fixture.get(); }
+        Fixture* GetFixture() const { return Fixture.get(); }
         bool IsSkipped() const { return Skipped; }
+        float GetDuration() const { return Duration; }
 
         std::string GetDisplayString() const { return MakeDisplayString(Section, Name); }
-        static std::string MakeDisplayString(const std::string& section, const std::string& name) 
+        static std::string MakeDisplayString(const std::string& section, const std::string& name)
         {
             return section + "." + name;
         }
@@ -456,7 +500,7 @@ namespace MTest
                 else
                 {
                     FailedAssertion = Info;
-                    throw CTestAbortedException{};
+                    throw CTestAssertionException{};
                 }
                 return false;
             }
@@ -476,24 +520,26 @@ namespace MTest
             CLog::Instance() << EConsoleColor::Red << "[Fatal  ] " << What << EConsoleColor::Default << "\n";
         }
 
-        void PrintTestInfo()
+        void OnExecutionStart()
         {
+            Start = TestClock::now();
             CLog::Instance() << EConsoleColor::Blue << "[Start  ] " << GetDisplayString() << EConsoleColor::Default << "\n";
         }
 
-        void PrintTestResult()
+        void OnExecutionEnd()
         {
+            Duration = TestClockDuration(TestClock::now()-Start).count();
             if( IsFailed() )
             {
-                CLog::Instance() << EConsoleColor::Red << "[Failure] " << GetDisplayString() << EConsoleColor::Default << "\n";
+                CLog::Instance() << EConsoleColor::Red << "[Failure] " << GetDisplayString() << " " << Details::FormatTime(Duration) << EConsoleColor::Default << "\n";
             }
             else if( IsSkipped() )
             {
-                CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << GetDisplayString() << EConsoleColor::Default << "\n";
+                CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << GetDisplayString() << " " << Details::FormatTime(Duration) << EConsoleColor::Default << "\n";
             }
             else
             {
-                CLog::Instance() << EConsoleColor::Green << "[Success] " << GetDisplayString() << EConsoleColor::Default << "\n";
+                CLog::Instance() << EConsoleColor::Green << "[Success] " << GetDisplayString() << " " << Details::FormatTime(Duration) << EConsoleColor::Default << "\n";
             }
         }
     protected:
@@ -508,13 +554,13 @@ namespace MTest
         }
 
         template<class F>
-        void PassRunner(F Callback)
+        void Runner(F Function)
         {
             try
             {
-                Callback();
+                Function();
             }
-            catch(const CTestAbortedException&) {}
+            catch(const CTestAssertionException&) {}
             catch(const CTestSkippedException&) {}
             catch(const std::exception& Exception)
             {
@@ -533,9 +579,11 @@ namespace MTest
         std::vector<SCheckInfo> FailedChecks;
         std::optional<SCheckInfo> FailedAssertion;
         bool Failed = false;
+        TestCallback Callback;
         FixturePtr Fixture;
-        UnitTestCallback Func;
         bool Skipped = false;
+        TestClockStamp Start = {};
+        float Duration = 0.0f; //! In miliseconds
     };
 
     //! Common Functionality that can be used to implement eg. Integration Tests
@@ -546,7 +594,7 @@ namespace MTest
         {
             #ifdef MTEST_WINDOWS_PLATFORM
             GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Detail::ToWin32Color(EConsoleColor::Default));
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Details::ToWin32Color(EConsoleColor::Default));
             #endif // MTEST_WINDOWS_PLATFORM
         }
 
@@ -563,8 +611,8 @@ namespace MTest
         ITestManager(ITestManager&&) = delete;
         ITestManager& operator=(ITestManager&&) = delete;
 
-        template<std::derived_from<ITestCase> T, class...Args>
-        void Add(const std::string& Section, const std::string& Name, const std::source_location& location, Args&&...args)
+        template<std::derived_from<ITestCase> T>
+        void Add(const std::string& Section, const std::string& Name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture)
         {
             auto& SectionContainer = Sections[Section];
             auto It = std::find_if(SectionContainer.begin(), SectionContainer.end(), [&](const std::unique_ptr<ITestCase>& Other)
@@ -577,7 +625,7 @@ namespace MTest
                     << EConsoleColor::Default << "\n";
                 return;
             }
-            auto tmp = std::make_unique<T>(Section, Name, location, std::forward<Args>(args)...);
+            auto tmp = std::make_unique<T>(Section, Name, location, std::move(callback), std::move(fixture));
             if( !tmp->GetFixture() )
             {
                 CLog::Instance() << EConsoleColor::Red << "[Error  ] Invalid fixture in: " << tmp->GetDisplayString() << "\n";
@@ -586,10 +634,56 @@ namespace MTest
             SectionContainer.emplace_back(std::move(tmp));
         }
 
-        void UpdateCaseStatus(ITestCase* testCase)
+        void Clear()
+        {
+            Sections.clear();
+            SuccessfulTestCases.clear();
+            FailedTestCases.clear();
+            SkippedTestCases.clear();
+            HasTests = false;
+            SectionTime = 0.0f;
+            TotalTime = 0.0f;
+            SetActiveCase(nullptr);
+        }
+
+        std::size_t GetSectionTestCount(const std::string& section) const
+        {
+            if( !Sections.count(section) )
+            {
+                return 0u;
+            }
+            return Sections.at(section).size();
+        }
+
+        const auto& GetSections() const { return Sections; }
+        bool HasAnyTest() const { return HasTests; }
+        float GetTotalTime() const { return TotalTime; }
+
+        void OnExecutionStart()
+        {
+            // Use literal when migrate to C++23 - 0uz
+            std::size_t testCount = std::accumulate(Sections.begin(), Sections.end(), std::size_t{0}, [](const std::size_t val, const auto& item)
+            {
+                return val + item.second.size();
+            });
+            HasTests = (testCount != 0u);
+            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
+                << Sections.size() << " sections" << EConsoleColor::Default << "\n";
+        }
+
+        void OnSectionStart(const std::string& name)
+        {
+            SectionTime = 0.0f;
+            CLog::Instance() << EConsoleColor::Blue << "[-------] Running section " << name << " which has " << GetSectionTestCount(name) << " tests"
+                << EConsoleColor::Default << "\n";
+        }
+
+        void UpdateStatus(ITestCase* testCase)
         {
             if( testCase )
             {
+                SectionTime += testCase->GetDuration();
+                TotalTime += testCase->GetDuration();
                 if( testCase->IsFailed() )
                 {
                     FailedTestCases.push_back( testCase );
@@ -605,47 +699,12 @@ namespace MTest
             }
         }
 
-        void Clear()
+        void OnSectionEnd(const std::string& name)
         {
-            Sections.clear();
-            SuccessfulTestCases.clear();
-            FailedTestCases.clear();
-            SkippedTestCases.clear();
-            SetActiveCase(nullptr);
+            CLog::Instance() << EConsoleColor::Blue << "[-------] Section " << name << " finished " << Details::FormatTime(SectionTime) << EConsoleColor::Default << "\n";
         }
 
-        std::size_t GetSectionTestCount(const std::string& section) const
-        {
-            if( !Sections.count(section) )
-            {
-                return 0u;
-            }
-            return Sections.at(section).size();
-        }
-
-        const auto& GetSections() const
-        {
-            return Sections;
-        }
-
-        void PrintStart()
-        {
-            int testCount = 0;
-            for(const auto& i: Sections)
-            {
-                testCount += i.second.size();
-            }
-            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
-                << Sections.size() << " sections" << EConsoleColor::Default << "\n";
-        }
-
-        void PrintSectionInfo(const std::string& name)
-        {
-            CLog::Instance() << EConsoleColor::Blue << "[-------] Running section " << name << " which has " << GetSectionTestCount(name) << " tests" 
-                << EConsoleColor::Default << "\n";
-        }
-
-        void PrintSummary(const std::vector<ITestCase*>& array, const EConsoleColor color, const std::string& caption)
+        void OnExecutionEnd(const std::vector<ITestCase*>& array, const EConsoleColor color, const std::string& caption)
         {
             if( array.size() )
             {
@@ -658,11 +717,20 @@ namespace MTest
             }
         }
 
-        void PrintSummary()
+        void OnExecutionEnd()
         {
-            PrintSummary(SkippedTestCases, EConsoleColor::Magenta, "Skipped");
-            PrintSummary(FailedTestCases, EConsoleColor::Red, "Failed");
-            PrintSummary(SuccessfulTestCases, EConsoleColor::Green, "Successful");
+            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running finished " << Details::FormatTime(TotalTime) << EConsoleColor::Default << "\n";
+            if( HasAnyTest() )
+            {
+                CLog::Instance() << EConsoleColor::Blue << "[Manager] Test summary:" << EConsoleColor::Default << "\n";
+                OnExecutionEnd(SkippedTestCases, EConsoleColor::Magenta, "Skipped");
+                OnExecutionEnd(FailedTestCases, EConsoleColor::Red, "Failed");
+                OnExecutionEnd(SuccessfulTestCases, EConsoleColor::Green, "Successful");
+            }
+            else
+            {
+                CLog::Instance() << EConsoleColor::Blue << "[Manager] No Test Run or Registered" << EConsoleColor::Default << "\n";
+            }
         }
 
         static void SetActiveCase(ITestCase* testCase)
@@ -685,6 +753,9 @@ namespace MTest
         std::vector<ITestCase*> SuccessfulTestCases;
         std::vector<ITestCase*> FailedTestCases;
         std::vector<ITestCase*> SkippedTestCases;
+        bool HasTests = false;
+        float SectionTime = 0.0f;
+        float TotalTime = 0.0f;
         static inline ITestCase* ActiveCase = nullptr;
     private:
         #ifdef MTEST_WINDOWS_PLATFORM
@@ -699,16 +770,16 @@ namespace MTest
         class CUnitTest final: public ITestCase
         {
         public:
-            CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, UnitTestInfoPair&& infoPair):
-                ITestCase(section, name, location, std::move(infoPair))
+            CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture):
+                ITestCase(section, name, location, std::move(callback), std::move(fixture))
             {
             }
 
             void Run() override
             {
-                PrintTestInfo();
+                OnExecutionStart();
                 //
-                PassRunner([&]()
+                Runner([&]()
                 {
                     if( Fixture->Skip() )
                     {
@@ -716,12 +787,12 @@ namespace MTest
                     }
                     Fixture->Setup();
                     //
-                    Func();
+                    Callback();
                 });
                 //
                 Fixture->Cleanup();
                 //
-                PrintTestResult();
+                OnExecutionEnd();
             }
         };
     public:
@@ -731,21 +802,13 @@ namespace MTest
             return Manager;
         }
 
-        template<std::derived_from<IFixture> C, class F>
-        static UnitTestInfoPair CreateUnitTestFixtureInfoPair(F func)
-        {
-            std::unique_ptr<C> fixture = std::make_unique<C>();
-            UnitTestCallback callback = std::bind(func, fixture.get());
-            return {std::move(fixture), callback};
-        }
-
         void Run()
         {
-            PrintStart();
+            OnExecutionStart();
             CLog::Instance() << "\n";
             for(const auto& i: Sections)
             {
-                PrintSectionInfo(i.first);
+                OnSectionStart(i.first);
                 for(const auto& j: i.second)
                 {
                     auto testCase = j.get();
@@ -753,12 +816,12 @@ namespace MTest
                     testCase->Run();
                     SetActiveCase(nullptr);
                     //
-                    UpdateCaseStatus(testCase);
+                    UpdateStatus(testCase);
                 }
-                PrintSectionInfo(i.first);
+                OnSectionEnd(i.first);
                 CLog::Instance() << "\n";
             }
-            PrintSummary();
+            OnExecutionEnd();
             //
             Clear();
         }
@@ -767,11 +830,14 @@ namespace MTest
         ~CTestManager() = default;
     };
 
-    struct STestProxy
+    struct SRegistrar
     {
-        STestProxy(const std::string& Section, const std::string& Name, const std::source_location& location, UnitTestInfoPair&& infoPair)
+        SRegistrar(const std::function<void()>& callback)
         {
-            CTestManager::Instance().Add<CTestManager::CUnitTest>(Section, Name, location, std::move(infoPair));
+            if( callback )
+            {
+                callback();
+            }
         }
     };
 }
