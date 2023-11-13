@@ -529,18 +529,34 @@ namespace MTest
         void OnExecutionEnd()
         {
             Duration = TestClockDuration(TestClock::now()-Start).count();
+            PrintResult(false);
+        }
+
+        void PrintResult(const bool fromManager)
+        {
             if( IsFailed() )
             {
-                CLog::Instance() << EConsoleColor::Red << "[Failure] " << GetDisplayString() << " " << Details::FormatTime(Duration) << EConsoleColor::Default << "\n";
+                CLog::Instance() << EConsoleColor::Red << "[Failure] " << GetDisplayString();
             }
             else if( IsSkipped() )
             {
-                CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << GetDisplayString() << " " << Details::FormatTime(Duration) << EConsoleColor::Default << "\n";
+                CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << GetDisplayString();
             }
             else
             {
-                CLog::Instance() << EConsoleColor::Green << "[Success] " << GetDisplayString() << " " << Details::FormatTime(Duration) << EConsoleColor::Default << "\n";
+                CLog::Instance() << EConsoleColor::Green << "[Success] " << GetDisplayString();
             }
+            //
+            if( !fromManager )
+            {
+                CLog::Instance() << " " << Details::FormatTime(Duration);
+            }
+            else
+            {
+                CLog::Instance() << ", File: " << GetFile() << ", Line: " << GetLine();
+            }
+            //
+            CLog::Instance() << EConsoleColor::Default << "\n";
         }
     protected:
         void MarkFailed()
@@ -610,6 +626,8 @@ namespace MTest
 
         ITestManager(ITestManager&&) = delete;
         ITestManager& operator=(ITestManager&&) = delete;
+
+        virtual void Run() = 0;
 
         template<std::derived_from<ITestCase> T>
         void Add(const std::string& Section, const std::string& Name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture)
@@ -704,32 +722,31 @@ namespace MTest
             CLog::Instance() << EConsoleColor::Blue << "[-------] Section " << name << " finished " << Details::FormatTime(SectionTime) << EConsoleColor::Default << "\n";
         }
 
-        void OnExecutionEnd(const std::vector<ITestCase*>& array, const EConsoleColor color, const std::string& caption)
-        {
-            if( array.size() )
-            {
-                CLog::Instance() << color << "[Manager] " << caption << " Unit Tests: " << array.size() << EConsoleColor::Default << "\n";
-                for(const auto& i: array)
-                {
-                    CLog::Instance() << color << "[Test   ] " << i->GetDisplayString() << ", File: " <<
-                        i->GetFile() << ", Line: " << i->GetLine() << EConsoleColor::Default << "\n";
-                }
-            }
-        }
-
         void OnExecutionEnd()
         {
             CLog::Instance() << EConsoleColor::Blue << "[Manager] Running finished " << Details::FormatTime(TotalTime) << EConsoleColor::Default << "\n";
             if( HasAnyTest() )
             {
                 CLog::Instance() << EConsoleColor::Blue << "[Manager] Test summary:" << EConsoleColor::Default << "\n";
-                OnExecutionEnd(SkippedTestCases, EConsoleColor::Magenta, "Skipped");
-                OnExecutionEnd(FailedTestCases, EConsoleColor::Red, "Failed");
-                OnExecutionEnd(SuccessfulTestCases, EConsoleColor::Green, "Successful");
+                PrintTestResults(SkippedTestCases, EConsoleColor::Magenta, "Skipped");
+                PrintTestResults(FailedTestCases, EConsoleColor::Red, "Failed");
+                PrintTestResults(SuccessfulTestCases, EConsoleColor::Green, "Successful");
             }
             else
             {
                 CLog::Instance() << EConsoleColor::Blue << "[Manager] No Test Run or Registered" << EConsoleColor::Default << "\n";
+            }
+        }
+
+        void PrintTestResults(const std::vector<ITestCase*>& array, const EConsoleColor color, const std::string& caption)
+        {
+            if( array.size() )
+            {
+                CLog::Instance() << color << "[Manager] " << caption << " Unit Tests: " << array.size() << EConsoleColor::Default << "\n";
+                for(const auto& i: array)
+                {
+                    i->PrintResult(true);
+                }
             }
         }
 
@@ -802,7 +819,7 @@ namespace MTest
             return Manager;
         }
 
-        void Run()
+        void Run() override
         {
             OnExecutionStart();
             CLog::Instance() << "\n";
