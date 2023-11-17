@@ -110,28 +110,76 @@ SOFTWARE.
 
 //// Test Setup
 
+#define MTEST_DETAIL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, ConcreteFixture) \
+namespace MTest::Internal \
+{ \
+    struct ConcreteFixture final : ParentFixture, IFixtureWrapper \
+    { \
+        static_assert(std::is_base_of<TableFixture, ParentFixture>::value, "Must be base of TableFixture"); \
+        ConcreteFixture(const DataType& testData, const std::size_t testIndex): \
+            MTest_TestData(testData), MTest_TestIndex(testIndex) \
+        {} \
+        std::string MTest_GenerateName() { return ParentFixture::GenerateName(MTest_TestData, MTest_TestIndex); } \
+        void MTest_Run(const DataType& testData); \
+        void MTest_Run() override { MTest_Run(MTest_TestData); } \
+        bool MTest_Skip() override { return ParentFixture::Skip(MTest_TestData); } \
+        void MTest_Setup() override { ParentFixture::Setup(MTest_TestData); } \
+        void MTest_Cleanup() override { ParentFixture::Cleanup(MTest_TestData); } \
+    private: \
+        const DataType MTest_TestData; \
+        const std::size_t MTest_TestIndex; \
+    }; \
+    SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
+    { \
+        []() \
+        { \
+            const auto numCases = DataArray.size(); \
+            for(std::size_t i = std::size_t{0}; i < numCases; ++i) \
+            { \
+                auto fixture = std::make_unique<ConcreteFixture>(DataArray[i], i); \
+                const std::string caseName = std::string{#Name}+"["+fixture->MTest_GenerateName()+"]"; \
+                CTestManager::Instance().Add<CTestManager::CUnitTest> \
+                ( \
+                    #Section, caseName, std::source_location::current(), std::move(fixture) \
+                ); \
+            } \
+        } \
+    }; \
+} \
+void MTest::Internal::ConcreteFixture::MTest_Run([[maybe_unused]] const MTest::Internal::ConcreteFixture::DataType& testData)
+
+//! Define test case, give section name, test case name, data array and fixture name. Tests are executed by section, test case name
+//! must be unique in given section.
+#define MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture) \
+    MTEST_DETAIL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
+
+//! Define test case, give section name, test case name and data array. Fixture name is deffered from section name eg. 'Section' + TableFixture
+//! Tests are executed by section, test case name must be unique in given section.
+#define MTEST_UNIT_TEST_F_T(Section, Name, DataArray) MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, Section##TableFixture )
+
 #define MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, ConcreteFixture) \
 namespace MTest::Internal \
 { \
-    struct ConcreteFixture final : public ParentFixture \
+    struct ConcreteFixture final : ParentFixture, IFixtureWrapper \
     { \
-        void MTest_TestMethod(); \
+        void MTest_Run() override; \
+        bool MTest_Skip() override { return ParentFixture::Skip(); } \
+        void MTest_Setup() override { ParentFixture::Setup(); } \
+        void MTest_Cleanup() override { ParentFixture::Cleanup(); } \
     }; \
     SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
     { \
         []() \
         { \
             auto fixture = std::make_unique<ConcreteFixture>(); \
-            TestCallback callback = std::bind(&ConcreteFixture::MTest_TestMethod, fixture.get()); \
             CTestManager::Instance().Add<CTestManager::CUnitTest> \
             ( \
-                #Section, #Name, std::source_location::current(), \
-                std::move(callback), std::move(fixture) \
+                #Section, #Name, std::source_location::current(), std::move(fixture) \
             ); \
         } \
     }; \
 } \
-void MTest::Internal::ConcreteFixture::MTest_TestMethod()
+void MTest::Internal::ConcreteFixture::MTest_Run()
 
 //! Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
 //! must be unique in given section.
@@ -424,24 +472,37 @@ namespace MTest
     };
 
     //! Fixture to use with Table tests.
-    template<class DataType>
-    struct TableFixture: public Fixture
+    template<class T, std::derived_from<Fixture> Base>
+    struct TableFixture: Base
     {
+        using DataType = T;
+        using BaseClass = Base;
+
         TableFixture() = default;
         virtual ~TableFixture() = default;
 
         //! Get Test case name
-        virtual std::string GetTestName(const DataType&, const std::size_t i) { return std::to_string(i); }
+        virtual std::string GenerateName(const DataType&, const std::size_t i) { return std::to_string(i); }
+
         //! Should return true if test case should be skipped.
-        virtual bool Skip(const DataType&, const std::size_t) { return Skip(); }
+        virtual bool Skip(const DataType&) { return BaseClass::Skip(); }
         //! Use Assertions to check state.
-        virtual void Setup(const DataType&, const std::size_t) { Setup(); }
+        virtual void Setup(const DataType&) { BaseClass::Setup(); }
         //! Cleanup if needed.
-        virtual void Cleanup(const DataType&, const std::size_t) { Cleanup(); }
+        virtual void Cleanup(const DataType&) { BaseClass::Cleanup(); }
     };
 
-    using FixturePtr = std::unique_ptr<Fixture>;
-    using TestCallback = std::function<void()>;
+    struct IFixtureWrapper
+    {
+        IFixtureWrapper() = default;
+        virtual ~IFixtureWrapper() = default;
+
+        virtual void MTest_Run() = 0;
+        virtual bool MTest_Skip() = 0;
+        virtual void MTest_Setup() = 0;
+        virtual void MTest_Cleanup() = 0;
+    };
+    using FixtureWrapperPtr = std::unique_ptr<IFixtureWrapper>;
 
     class ITestCase
     {
@@ -449,12 +510,11 @@ namespace MTest
         using TestClockStamp = std::chrono::steady_clock::time_point;
         using TestClockDuration = std::chrono::duration<float, std::milli>;
     public:
-        ITestCase(const std::string& section, const std::string& name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture):
+        ITestCase(const std::string& section, const std::string& name, const std::source_location& location, FixtureWrapperPtr&& fixture):
             Section(section),
             Name(name),
             File(Details::GetFileName(location.file_name())),
             Line(location.line()),
-            Callback(std::move(callback)),
             Fixture(std::move(fixture))
         {
         }
@@ -475,7 +535,7 @@ namespace MTest
         bool IsFailed() const { return Failed; }
         const std::vector<SCheckInfo>& GetFailedChecks() const { return FailedChecks; }
         const std::optional<SCheckInfo>& GetFailedAssertion() const { return FailedAssertion; }
-        Fixture* GetFixture() const { return Fixture.get(); }
+        IFixtureWrapper* GetFixture() const { return Fixture.get(); }
         bool IsSkipped() const { return Skipped; }
         float GetDuration() const { return Duration; }
 
@@ -595,8 +655,7 @@ namespace MTest
         std::vector<SCheckInfo> FailedChecks;
         std::optional<SCheckInfo> FailedAssertion;
         bool Failed = false;
-        TestCallback Callback;
-        FixturePtr Fixture;
+        FixtureWrapperPtr Fixture;
         bool Skipped = false;
         TestClockStamp Start = {};
         float Duration = 0.0f; //! In miliseconds
@@ -630,7 +689,7 @@ namespace MTest
         virtual void Run() = 0;
 
         template<std::derived_from<ITestCase> T>
-        void Add(const std::string& Section, const std::string& Name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture)
+        void Add(const std::string& Section, const std::string& Name, const std::source_location& location, FixtureWrapperPtr&& fixture)
         {
             auto& SectionContainer = Sections[Section];
             auto It = std::find_if(SectionContainer.begin(), SectionContainer.end(), [&](const std::unique_ptr<ITestCase>& Other)
@@ -643,10 +702,10 @@ namespace MTest
                     << EConsoleColor::Default << "\n";
                 return;
             }
-            auto tmp = std::make_unique<T>(Section, Name, location, std::move(callback), std::move(fixture));
-            if( !tmp->GetFixture() )
+            auto tmp = std::make_unique<T>(Section, Name, location, std::move(fixture));
+            if( !tmp )
             {
-                CLog::Instance() << EConsoleColor::Red << "[Error  ] Invalid fixture in: " << tmp->GetDisplayString() << "\n";
+                CLog::Instance() << EConsoleColor::Red << "[Error  ] Invalid Test Case in: " << ITestCase::MakeDisplayString(Section, Name) << "\n";
                 return;
             }
             SectionContainer.emplace_back(std::move(tmp));
@@ -787,8 +846,8 @@ namespace MTest
         class CUnitTest final: public ITestCase
         {
         public:
-            CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, TestCallback&& callback, FixturePtr fixture):
-                ITestCase(section, name, location, std::move(callback), std::move(fixture))
+            CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, FixtureWrapperPtr&& fixture):
+                ITestCase(section, name, location, std::move(fixture))
             {
             }
 
@@ -798,16 +857,15 @@ namespace MTest
                 //
                 Runner([&]()
                 {
-                    if( Fixture->Skip() )
+                    if( Fixture->MTest_Skip() )
                     {
                         Skip("Test case is skipped by Fixture");
                     }
-                    Fixture->Setup();
+                    Fixture->MTest_Setup();
                     //
-                    Callback();
+                    Fixture->MTest_Run();
                 });
-                //
-                Fixture->Cleanup();
+                Fixture->MTest_Cleanup();
                 //
                 OnExecutionEnd();
             }

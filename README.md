@@ -119,6 +119,45 @@ MTEST_UNIT_TEST(Exceptions, Uncaught)
     MTEST_ASSERT_FALSE(flag);
 }
 
+//! Table test data definition
+struct MathTestData
+{
+    std::string Name;
+    int Arg1;
+    int Arg2;
+    int Result;
+};
+//! Table fixture: Pass test data type and base class(derivied from Fixture)
+struct MathTestTableFixture: public MTest::TableFixture<MathTestData, MTest::Fixture>
+{
+    //! Overwrite to update test case name
+    std::string GenerateName(const DataType& item, const std::size_t) override
+    {
+        return item.Name;
+    }
+
+    //! Some helper
+    void CheckWork(const int x, const int y, const int r)
+    {
+        const int z = x+y;
+        MTEST_ASSERT_VALUE(z, r);
+    }
+};
+//! Define test array
+std::vector<MathTestData> MathTestDataArray = 
+{
+    {"AddPositives", 3, 3, 6},
+    {"AddZeros", 0, 0, 0},
+    {"AddMixed", -2, 3, 1},
+    {"AddPositives2", 3, 7, 10}
+};
+//! Define Test Case
+MTEST_UNIT_TEST_F_T(MathTest, EnigmaticFunction, MathTestDataArray)
+{
+    //! Access test data with: testData
+    CheckWork(testData.Arg1, testData.Arg2, testData.Result);
+}
+
 //! Implements main() function
 MTEST_MAIN
 
