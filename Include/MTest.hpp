@@ -153,7 +153,7 @@ void MTest::Internal::ConcreteFixture::MTest_Run([[maybe_unused]] const MTest::I
 #define MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture) \
     MTEST_DETAIL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-//! Define test case, give section name, test case name and data array. Fixture name is deffered from section name eg. 'Section' + TableFixture
+//! Define test case, give section name, test case name and data array. Fixture name is inferred from section name eg. 'Section' + TableFixture
 //! Tests are executed by section, test case name must be unique in given section.
 #define MTEST_UNIT_TEST_F_T(Section, Name, DataArray) MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, Section##TableFixture )
 
@@ -185,7 +185,7 @@ void MTest::Internal::ConcreteFixture::MTest_Run()
 //! must be unique in given section.
 #define MTEST_UNIT_TEST_FX(Section, Name, ParentFixture) MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-//! Define test case, give section name, test case name. Fixture name is deffered from section name eg. 'Section' + Fixture
+//! Define test case, give section name, test case name. Fixture name is inferred from section name eg. 'Section' + Fixture
 //! Tests are executed by section, test case name must be unique in given section.
 #define MTEST_UNIT_TEST_F(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, Section##Fixture )
 
