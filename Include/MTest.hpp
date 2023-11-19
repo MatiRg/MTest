@@ -654,7 +654,7 @@ namespace MTest
         }
 
         template<class F>
-        void Runner(F Function)
+        void Wrapper(F Function)
         {
             try
             {
@@ -878,8 +878,8 @@ namespace MTest
             void Run() override
             {
                 OnExecutionStart();
-                //
-                Runner([&]()
+                // Run
+                Wrapper([&]()
                 {
                     if( Fixture->MTest_Skip() )
                     {
@@ -889,7 +889,11 @@ namespace MTest
                     //
                     Fixture->MTest_Run();
                 });
-                Fixture->MTest_Cleanup();
+                // Clear if needed
+                Wrapper([&]()
+                {
+                    Fixture->MTest_Cleanup();
+                });
                 //
                 OnExecutionEnd();
             }
