@@ -111,42 +111,40 @@ SOFTWARE.
 //// Test Setup
 
 #define MTEST_DETAIL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, ConcreteFixture) \
-namespace MTest::Internal \
+struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
 { \
-    struct ConcreteFixture final : ParentFixture, IFixtureWrapper \
+    static_assert(MTest::IsTableDataArray<decltype(DataArray)>::value, "Data Array must be of type TableDataArray"); \
+    static_assert(MTest::IsTableFixture<ParentFixture>::value, "Must be base of TableFixture"); \
+    ConcreteFixture(const DataType& testData, const std::size_t testIndex): \
+        MTest_TestData(testData), MTest_TestIndex(testIndex) \
+    {} \
+    std::string MTest_GenerateName() { return ParentFixture::GenerateName(MTest_TestData, MTest_TestIndex); } \
+    void MTest_Run(const DataType& testData); \
+    void MTest_Run() override { MTest_Run(MTest_TestData); } \
+    bool MTest_Skip() override { return ParentFixture::Skip(MTest_TestData); } \
+    void MTest_Setup() override { ParentFixture::Setup(MTest_TestData); } \
+    void MTest_Cleanup() override { ParentFixture::Cleanup(MTest_TestData); } \
+private: \
+    const DataType MTest_TestData; \
+    const std::size_t MTest_TestIndex; \
+}; \
+MTest::SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
+{ \
+    []() \
     { \
-        static_assert(std::is_base_of<TableFixture, ParentFixture>::value, "Must be base of TableFixture"); \
-        ConcreteFixture(const DataType& testData, const std::size_t testIndex): \
-            MTest_TestData(testData), MTest_TestIndex(testIndex) \
-        {} \
-        std::string MTest_GenerateName() { return ParentFixture::GenerateName(MTest_TestData, MTest_TestIndex); } \
-        void MTest_Run(const DataType& testData); \
-        void MTest_Run() override { MTest_Run(MTest_TestData); } \
-        bool MTest_Skip() override { return ParentFixture::Skip(MTest_TestData); } \
-        void MTest_Setup() override { ParentFixture::Setup(MTest_TestData); } \
-        void MTest_Cleanup() override { ParentFixture::Cleanup(MTest_TestData); } \
-    private: \
-        const DataType MTest_TestData; \
-        const std::size_t MTest_TestIndex; \
-    }; \
-    SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
-    { \
-        []() \
+        const auto numCases = DataArray.size(); \
+        for(std::size_t i = std::size_t{0}; i < numCases; ++i) \
         { \
-            const auto numCases = DataArray.size(); \
-            for(std::size_t i = std::size_t{0}; i < numCases; ++i) \
-            { \
-                auto fixture = std::make_unique<ConcreteFixture>(DataArray[i], i); \
-                const std::string caseName = std::string{#Name}+"["+fixture->MTest_GenerateName()+"]"; \
-                CTestManager::Instance().Add<CTestManager::CUnitTest> \
-                ( \
-                    #Section, caseName, std::source_location::current(), std::move(fixture) \
-                ); \
-            } \
+            auto fixture = std::make_unique<ConcreteFixture>(DataArray[i], i); \
+            const std::string caseName = std::string{#Name}+"["+fixture->MTest_GenerateName()+"]"; \
+            MTest::CTestManager::Instance().Add<MTest::CTestManager::CUnitTest> \
+            ( \
+                #Section, caseName, std::source_location::current(), std::move(fixture) \
+            ); \
         } \
-    }; \
-} \
-void MTest::Internal::ConcreteFixture::MTest_Run([[maybe_unused]] const MTest::Internal::ConcreteFixture::DataType& testData)
+    } \
+}; \
+void ConcreteFixture::MTest_Run([[maybe_unused]] const ConcreteFixture::DataType& testData)
 
 //! Define test case, give section name, test case name, data array and fixture name. Tests are executed by section, test case name
 //! must be unique in given section.
@@ -158,28 +156,26 @@ void MTest::Internal::ConcreteFixture::MTest_Run([[maybe_unused]] const MTest::I
 #define MTEST_UNIT_TEST_F_T(Section, Name, DataArray) MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, Section##TableFixture )
 
 #define MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, ConcreteFixture) \
-namespace MTest::Internal \
+struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
 { \
-    struct ConcreteFixture final : ParentFixture, IFixtureWrapper \
+    static_assert(std::is_base_of<MTest::Fixture, ParentFixture>::value, "Must be base of Fixture"); \
+    void MTest_Run() override; \
+    bool MTest_Skip() override { return ParentFixture::Skip(); } \
+    void MTest_Setup() override { ParentFixture::Setup(); } \
+    void MTest_Cleanup() override { ParentFixture::Cleanup(); } \
+}; \
+MTest::SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
+{ \
+    []() \
     { \
-        void MTest_Run() override; \
-        bool MTest_Skip() override { return ParentFixture::Skip(); } \
-        void MTest_Setup() override { ParentFixture::Setup(); } \
-        void MTest_Cleanup() override { ParentFixture::Cleanup(); } \
-    }; \
-    SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
-    { \
-        []() \
-        { \
-            auto fixture = std::make_unique<ConcreteFixture>(); \
-            CTestManager::Instance().Add<CTestManager::CUnitTest> \
-            ( \
-                #Section, #Name, std::source_location::current(), std::move(fixture) \
-            ); \
-        } \
-    }; \
-} \
-void MTest::Internal::ConcreteFixture::MTest_Run()
+        auto fixture = std::make_unique<ConcreteFixture>(); \
+        MTest::CTestManager::Instance().Add<MTest::CTestManager::CUnitTest> \
+        ( \
+            #Section, #Name, std::source_location::current(), std::move(fixture) \
+        ); \
+    } \
+}; \
+void ConcreteFixture::MTest_Run()
 
 //! Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
 //! must be unique in given section.
@@ -191,7 +187,7 @@ void MTest::Internal::ConcreteFixture::MTest_Run()
 
 //! Define test case, give section name and test case name. Tests are executed by section, test case name
 //! must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, Fixture)
+#define MTEST_UNIT_TEST(Section, Name) MTEST_DETAIL_UNIT_TEST_FX(Section, Name, MTest::Fixture, MTEST_MACRO_CONCAT(MTest_Fixture, __COUNTER__))
 
 //! Add STD Logger
 #define MTEST_IMPLEMENT_STD_LOGGER MTest::CLog::Instance().AddWriter<MTest::CStdWriter>()
@@ -471,11 +467,22 @@ namespace MTest
         virtual void Cleanup() {}
     };
 
+    //! Table test data array
+    template<class T>
+    using TableDataArray = std::vector<T>;
+    // Type traits
+    template<class T>
+    struct IsTableDataArray: std::false_type
+    {};
+    template<class T>
+    struct IsTableDataArray<TableDataArray<T>>: std::true_type
+    {};
+
     //! Fixture to use with Table tests.
-    template<class T, std::derived_from<Fixture> Base>
+    template<class Type, std::derived_from<Fixture> Base>
     struct TableFixture: Base
     {
-        using DataType = T;
+        using DataType = Type;
         using BaseClass = Base;
 
         TableFixture() = default;
@@ -491,6 +498,23 @@ namespace MTest
         //! Cleanup if needed.
         virtual void Cleanup(const DataType&) { BaseClass::Cleanup(); }
     };
+    // Type traits
+    // https://en.cppreference.com/w/cpp/types/is_base_of
+    // https://stackoverflow.com/questions/36632897/type-trait-to-check-whether-some-type-is-derived-from-a-class-template?rq=3
+    namespace Details
+    {
+        template<class T, class U>
+        std::true_type IsTableFixture(const TableFixture<T, U>*) { return {}; }
+        std::false_type IsTableFixture(const void*) { return {}; }
+    }
+    template<class Derived>
+    struct IsTableFixture: 
+        std::integral_constant
+        <
+            bool,
+            decltype(Details::IsTableFixture(std::declval<typename std::remove_cv<Derived*>::type>()))::value
+        >
+    {};
 
     struct IFixtureWrapper
     {

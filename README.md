@@ -118,9 +118,9 @@ struct MathTestTableFixture: public MTest::TableFixture<MathTestData, MTest::Fix
     }
 };
 ```
-Next step is do define test data using `MathTestData` struct and `std::vector`.
+Next step is do define test data using `MathTestData` struct and `MTest::TableDataArray` as array.
 ```C++
-std::vector<MathTestData> MathTestDataArray = 
+MTest::TableDataArray<MathTestData> MathTestDataArray = 
 {
     {"AddPositives", 3, 3, 6},
     {"AddZeros", 0, 0, 0},

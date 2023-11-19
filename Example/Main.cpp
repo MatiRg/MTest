@@ -158,7 +158,7 @@ struct MathTestTableFixture: public MTest::TableFixture<MathTestData, MTest::Fix
     }
 };
 //! Define test array
-std::vector<MathTestData> MathTestDataArray = 
+MTest::TableDataArray<MathTestData> MathTestDataArray = 
 {
     {"AddPositives", 3, 3, 6},
     {"AddZeros", 0, 0, 0},
