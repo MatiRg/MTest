@@ -1,7 +1,7 @@
 /*
 MIT License
 
-Copyright (c) 2023 Mateusz Rugor
+Copyright (c) 2024 Mateusz Rugor
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -23,11 +23,8 @@ SOFTWARE.
 */
 #pragma once
 #include <string>
-#include <iostream>
-#include <functional>
 #include <vector>
 #include <algorithm>
-#include <ostream>
 #include <unordered_map>
 #include <memory>
 #include <utility>
@@ -35,12 +32,13 @@ SOFTWARE.
 #include <stdexcept>
 #include <source_location>
 #include <cstdint>
-#include <sstream>
 #include <optional>
 #include <concepts>
-#include <fstream>
 #include <chrono>
 #include <numeric>
+#include <cstdlib>
+#include <cstdio>
+#include <format>
 
 #if defined(_WIN64) || defined(_WIN32) || defined(WIN32)
     #define MTEST_WINDOWS_PLATFORM 1
@@ -57,60 +55,75 @@ SOFTWARE.
 
 //// Utils
 
-#define MTEST_DETAIL_MACRO_CONCAT(x, y) x##y
-//! Needed because __LINE__ or __COUNTER__ itself is a macro so it needs two level expanding.
-#define MTEST_MACRO_CONCAT(x, y) MTEST_DETAIL_MACRO_CONCAT(x, y)
+#define MTEST_IMPL_MACRO_CONCAT(x, y) x##y
+/// Needed because __LINE__ or __COUNTER__ itself is a macro so it needs two level expanding.
+#define MTEST_MACRO_CONCAT(x, y) MTEST_IMPL_MACRO_CONCAT(x, y)
 
 //// Assertions
 
-#define MTEST_DETAIL_CHECK_TRUE(Cond, IsAssert) MTest::ITestManager::GetActiveCase()->Check( #Cond , (Cond) , IsAssert )
-#define MTEST_DETAIL_CHECK_FALSE(Cond, IsAssert) MTest::ITestManager::GetActiveCase()->Check( #Cond , !(Cond) , IsAssert )
-#define MTEST_DETAIL_CHECK_VALUE(Value, Wanted, IsAssert) MTEST_DETAIL_CHECK_TRUE(Value == Wanted, IsAssert)
-#define MTEST_DETAIL_CHECK_NOT_VALUE(Value, Wanted, IsAssert) MTEST_DETAIL_CHECK_TRUE(Value != Wanted, IsAssert)
-#define MTEST_DETAIL_CHECK_NULL(Value, IsAssert) MTEST_DETAIL_CHECK_VALUE(Value, nullptr, IsAssert)
-#define MTEST_DETAIL_CHECK_NOT_NULL(Value, IsAssert) MTEST_DETAIL_CHECK_NOT_VALUE(Value, nullptr, IsAssert)
+#define MTEST_IMPL_CHECK_TRUE(Condition, Type) MTest::CTestManager::Instance().GetActiveTest()->Check( #Condition, (Condition), Type )
+#define MTEST_IMPL_CHECK_FALSE(Condition, Type) MTest::CTestManager::Instance().GetActiveTest()->Check( #Condition, !(Condition), Type )
+#define MTEST_IMPL_CHECK_VALUE(Value, Wanted, Type) MTEST_IMPL_CHECK_TRUE(Value == Wanted, Type)
+#define MTEST_IMPL_CHECK_NOT_VALUE(Value, Wanted, Type) MTEST_IMPL_CHECK_TRUE(Value != Wanted, Type)
+#define MTEST_IMPL_CHECK_NULL(Value, Type) MTEST_IMPL_CHECK_VALUE(Value, nullptr, Type)
+#define MTEST_IMPL_CHECK_NOT_NULL(Value, Type) MTEST_IMPL_CHECK_NOT_VALUE(Value, nullptr, Type)
+#define MTEST_IMPL_CHECK_THROW(Statement, Exception, Type) MTest::CTestManager::Instance().GetActiveTest()->Throw< Exception >( [&](){ Statement; }, Type )
+#define MTEST_IMPL_CHECK_ANY_THROW(Statement, Type) MTest::CTestManager::Instance().GetActiveTest()->AnyThrow( [&](){ Statement; }, Type )
+#define MTEST_IMPL_CHECK_NO_THROW(Statement, Type) MTest::CTestManager::Instance().GetActiveTest()->NoThrow( [&](){ Statement; }, Type )
 
-//! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_TRUE(Cond) MTEST_DETAIL_CHECK_TRUE(Cond, false)
-//! It must evaluate to false statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_FALSE(Cond) MTEST_DETAIL_CHECK_FALSE(Cond, false)
-//! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK(Cond) MTEST_DETAIL_CHECK_TRUE(Cond, false)
-//! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_VALUE(Value, Wanted) MTEST_DETAIL_CHECK_VALUE(Value, Wanted, false)
-//! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_NOT_VALUE(Value, Wanted) MTEST_DETAIL_CHECK_NOT_VALUE(Value, Wanted, false)
-//! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_NULL(Value) MTEST_DETAIL_CHECK_NULL(Value, false)
-//! It must evaluate to true statement, if not test will fail but will continue execution.
-#define MTEST_CHECK_NOT_NULL(Value) MTEST_DETAIL_CHECK_NOT_NULL(Value, false)
+/// It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_TRUE(Condition) MTEST_IMPL_CHECK_TRUE(Condition, MTest::EFailType::Check)
+/// It must evaluate to false statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_FALSE(Condition) MTEST_IMPL_CHECK_FALSE(Condition, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK(Condition) MTEST_IMPL_CHECK_TRUE(Condition, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_VALUE(Value, Wanted) MTEST_IMPL_CHECK_VALUE(Value, Wanted, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_NOT_VALUE(Value, Wanted) MTEST_IMPL_CHECK_NOT_VALUE(Value, Wanted, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_NULL(Value) MTEST_IMPL_CHECK_NULL(Value, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail but will continue execution.
+#define MTEST_CHECK_NOT_NULL(Value) MTEST_IMPL_CHECK_NOT_NULL(Value, MTest::EFailType::Check)
+/// Check if given exception is throw
+#define MTEST_CHECK_THROW(Statement, Exception) MTEST_IMPL_CHECK_THROW(Statement, Exception, MTest::EFailType::Check)
+/// Check if any exception is throw
+#define MTEST_CHECK_ANY_THROW(Statement) MTEST_IMPL_CHECK_ANY_THROW(Statement, MTest::EFailType::Check)
+/// Check if exception is not throw
+#define MTEST_CHECK_NO_THROW(Statement) MTEST_IMPL_CHECK_NO_THROW(Statement, MTest::EFailType::Check)
 
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT_TRUE(Cond) MTEST_DETAIL_CHECK_TRUE(Cond, true)
-//! Must evaluate to false statement, if not test will fail and will exit.
-#define MTEST_ASSERT_FALSE(Cond) MTEST_DETAIL_CHECK_FALSE(Cond, true)
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT(Cond) MTEST_DETAIL_CHECK_TRUE(Cond, true)
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT_VALUE(Value, Wanted) MTEST_DETAIL_CHECK_VALUE(Value, Wanted, true)
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT_NOT_VALUE(Value, Wanted) MTEST_DETAIL_CHECK_NOT_VALUE(Value, Wanted, true)
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT_NULL(Value) MTEST_DETAIL_CHECK_NULL(Value, true)
-//! Must evaluate to true statement, if not test will fail and will exit.
-#define MTEST_ASSERT_NOT_NULL(Value) MTEST_DETAIL_CHECK_NOT_NULL(Value, true)
+/// Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_TRUE(Condition) MTEST_IMPL_CHECK_TRUE(Condition, MTest::EFailType::Assert)
+/// Must evaluate to false statement, if not test will fail and will exit.
+#define MTEST_ASSERT_FALSE(Condition) MTEST_IMPL_CHECK_FALSE(Condition, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT(Condition) MTEST_IMPL_CHECK_TRUE(Condition, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_VALUE(Value, Wanted) MTEST_IMPL_CHECK_VALUE(Value, Wanted, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_NOT_VALUE(Value, Wanted) MTEST_IMPL_CHECK_NOT_VALUE(Value, Wanted, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_NULL(Value) MTEST_IMPL_CHECK_NULL(Value, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and will exit.
+#define MTEST_ASSERT_NOT_NULL(Value) MTEST_IMPL_CHECK_NOT_NULL(Value, MTest::EFailType::Assert)
+/// Check if given exception is throw
+#define MTEST_ASSERT_THROW(Statement, Exception) MTEST_IMPL_CHECK_THROW(Statement, Exception, MTest::EFailType::Assert)
+/// Check if any exception is throw
+#define MTEST_ASSERT_ANY_THROW(Statement) MTEST_IMPL_CHECK_ANY_THROW(Statement, MTest::EFailType::Assert)
+/// Check if exception is not throw
+#define MTEST_ASSERT_NO_THROW(Statement) MTEST_IMPL_CHECK_NO_THROW(Statement, MTest::EFailType::Assert)
 
 //// Logs & Utility
 
-//! Skip test
-#define MTEST_SKIP(Reason) MTest::ITestManager::GetActiveCase()->Skip( Reason )
+/// Skip test
+#define MTEST_SKIP(Reason) MTest::CTestManager::Instance().GetActiveTest()->Skip( Reason )
 
-//! Print some information to stdout.
+/// Print some information to stdout.
 #define MTEST_INFO(Msg) MTest::CLog::Instance() << MTest::EConsoleColor::Default << "[Message] " << Msg << "\n"
 
 //// Test Setup
 
-#define MTEST_DETAIL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, ConcreteFixture) \
+#define MTEST_IMPL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, ConcreteFixture) \
 struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
 { \
     static_assert(MTest::IsTableDataArray<decltype(DataArray)>::value, "Data Array must be of type TableDataArray"); \
@@ -128,34 +141,37 @@ private: \
     const DataType MTest_TestData; \
     const std::size_t MTest_TestIndex; \
 }; \
-MTest::SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
+namespace \
 { \
-    []() \
+    const MTest::Registrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
     { \
-        const auto numCases = DataArray.size(); \
-        for(std::size_t i = std::size_t{0}; i < numCases; ++i) \
+        []() \
         { \
-            auto fixture = std::make_unique<ConcreteFixture>(DataArray[i], i); \
-            const std::string caseName = std::string{#Name}+"["+fixture->MTest_GenerateName()+"]"; \
-            MTest::CTestManager::Instance().Add<MTest::CTestManager::CUnitTest> \
-            ( \
-                #Section, caseName, std::source_location::current(), std::move(fixture) \
-            ); \
+            const auto numCases = DataArray.size(); \
+            for(std::size_t i = std::size_t{0}; i < numCases; ++i) \
+            { \
+                auto fixture = std::make_unique<ConcreteFixture>(DataArray[i], i); \
+                const std::string caseName = std::format("{}[{}]", #Name, fixture->MTest_GenerateName()); \
+                MTest::CTestManager::Instance().AddTest \
+                ( \
+                    #Section, caseName, std::source_location::current(), std::move(fixture) \
+                ); \
+            } \
         } \
-    } \
-}; \
+    }; \
+} \
 void ConcreteFixture::MTest_Run([[maybe_unused]] const ConcreteFixture::DataType& testData)
 
-//! Define test case, give section name, test case name, data array and fixture name. Tests are executed by section, test case name
-//! must be unique in given section.
+/// Define test case, give section name, test case name, data array and fixture name. Tests are executed by section, test case name
+/// must be unique in given section.
 #define MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture) \
-    MTEST_DETAIL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
+    MTEST_IMPL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-//! Define test case, give section name, test case name and data array. Fixture name is inferred from section name eg. 'Section' + TableFixture
-//! Tests are executed by section, test case name must be unique in given section.
+/// Define test case, give section name, test case name and data array. Fixture name is inferred from section name eg. 'Section' + TableFixture
+/// Tests are executed by section, test case name must be unique in given section.
 #define MTEST_UNIT_TEST_F_T(Section, Name, DataArray) MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, Section##TableFixture )
 
-#define MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, ConcreteFixture) \
+#define MTEST_IMPL_UNIT_TEST_FX(Section, Name, ParentFixture, ConcreteFixture) \
 struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
 { \
     static_assert(std::is_base_of<MTest::Fixture, ParentFixture>::value, "Must be base of Fixture"); \
@@ -164,45 +180,47 @@ struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
     void MTest_Setup() override { ParentFixture::Setup(); } \
     void MTest_Cleanup() override { ParentFixture::Cleanup(); } \
 }; \
-MTest::SRegistrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
+namespace \
 { \
-    []() \
+    const MTest::Registrar MTEST_MACRO_CONCAT(MTest_Registrar_, __COUNTER__) \
     { \
-        auto fixture = std::make_unique<ConcreteFixture>(); \
-        MTest::CTestManager::Instance().Add<MTest::CTestManager::CUnitTest> \
-        ( \
-            #Section, #Name, std::source_location::current(), std::move(fixture) \
-        ); \
-    } \
-}; \
+        []() \
+        { \
+            auto fixture = std::make_unique<ConcreteFixture>(); \
+            MTest::CTestManager::Instance().AddTest \
+            ( \
+                #Section, #Name, std::source_location::current(), std::move(fixture) \
+            ); \
+        } \
+    }; \
+} \
 void ConcreteFixture::MTest_Run()
 
-//! Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
-//! must be unique in given section.
-#define MTEST_UNIT_TEST_FX(Section, Name, ParentFixture) MTEST_DETAIL_UNIT_TEST_FX(Section, Name, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
+/// Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
+/// must be unique in given section.
+#define MTEST_UNIT_TEST_FX(Section, Name, ParentFixture) MTEST_IMPL_UNIT_TEST_FX(Section, Name, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-//! Define test case, give section name, test case name. Fixture name is inferred from section name eg. 'Section' + Fixture
-//! Tests are executed by section, test case name must be unique in given section.
+/// Define test case, give section name, test case name. Fixture name is inferred from section name eg. 'Section' + Fixture
+/// Tests are executed by section, test case name must be unique in given section.
 #define MTEST_UNIT_TEST_F(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, Section##Fixture )
 
-//! Define test case, give section name and test case name. Tests are executed by section, test case name
-//! must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) MTEST_DETAIL_UNIT_TEST_FX(Section, Name, MTest::Fixture, MTEST_MACRO_CONCAT(MTest_Fixture, __COUNTER__))
+/// Define test case, give section name and test case name. Tests are executed by section, test case name
+/// must be unique in given section.
+#define MTEST_UNIT_TEST(Section, Name) MTEST_IMPL_UNIT_TEST_FX(Section, Name, MTest::Fixture, MTEST_MACRO_CONCAT(MTest_Fixture, __COUNTER__))
 
-//! Add STD Logger
-#define MTEST_IMPLEMENT_STD_LOGGER MTest::CLog::Instance().AddWriter<MTest::CStdWriter>()
-//! Add File Logger
-#define MTEST_IMPLEMENT_FILE_LOGGER(File) MTest::CLog::Instance().AddWriter<MTest::CFileWriter>( File )
-//! Use to launch unit test application.
-#define MTEST_IMPLEMENT_MAIN MTest::CTestManager::Instance().Run()
+/// Add STD sink.
+#define MTEST_CREATE_STD_SINK MTest::CLog::Instance().CreateSink<MTest::CStdSink>()
+/// Add File sink.
+#define MTEST_CREATE_FILE_SINK(File) MTest::CLog::Instance().CreateSink<MTest::CFileSink>( File )
+/// Use to launch unit test application.
+#define MTEST_RUN_TESTS MTest::CTestManager::Instance().Run()
 
-//! Use to Implement Unit test main().
+/// Use to Implement Unit test main().
 #define MTEST_MAIN \
 int main(int, char*[]) \
 { \
-    MTEST_IMPLEMENT_STD_LOGGER; \
-    MTEST_IMPLEMENT_MAIN; \
-	return 0; \
+    MTEST_CREATE_STD_SINK; \
+	return MTEST_RUN_TESTS; \
 }
 
 namespace MTest
@@ -217,35 +235,17 @@ namespace MTest
         Magenta
     };
 
+    enum class EFailType
+    {
+        Check,
+        Assert
+    };
+
     namespace Details
     {
-        inline std::string GetFileName(const std::string& Path)
-        {
-            const auto Pos = Path.find_last_of("\\/");
-            if( Pos == std::string::npos )
-            {
-                return Path;
-            }
-            else
-            {
-                return Path.substr(Pos+1u);
-            }
-        }
-
-        inline std::string FormatTime(const float timeInMS)
-        {
-            const bool toSeconds = timeInMS >= 100.0f;
-            std::ostringstream Stream;
-            Stream << "(";
-            Stream << (toSeconds ? timeInMS/1000.0f : timeInMS);
-            Stream << (toSeconds ? " s" : " ms");
-            Stream << ")";
-            return Stream.str();
-        }
-
         #ifdef MTEST_WINDOWS_PLATFORM
         // https://learn.microsoft.com/en-us/dotnet/api/system.consolecolor?view=net-7.0
-        inline int ToWin32Color(const EConsoleColor x)
+        inline int ColorToWin32(const EConsoleColor x)
         {
             switch(x)
             {
@@ -267,7 +267,7 @@ namespace MTest
         }
         #else
         // https://www.codeproject.com/Tips/5255355/How-to-Put-Color-on-Windows-Console
-        inline std::string ToAnsiColor(const EConsoleColor x)
+        inline std::string ColorToAnsi(const EConsoleColor x)
         {
             switch(x)
             {
@@ -288,154 +288,184 @@ namespace MTest
             }
         }
         #endif // MTEST_WINDOWS_PLATFORM
+
+        inline std::string FailTypeToString(const EFailType x)
+        {
+            switch(x)
+            {
+            case EFailType::Check:
+                return "[Check  ]";
+            case EFailType::Assert:
+                return "[Assert ]";
+            default:
+                return "[???????]";
+            }
+        }
+
+        inline std::string FilenameFromPath(const std::string& path)
+        {
+            const auto idx = path.find_last_of("\\/");
+            if( idx == std::string::npos )
+            {
+                return path;
+            }
+            else
+            {
+                return path.substr(idx+1u);
+            }
+        }
     }
 
-    inline std::ostream& operator<<(std::ostream& Stream, const EConsoleColor x)
+    struct SCheckInfo final
     {
-        #ifdef MTEST_WINDOWS_PLATFORM
-        SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Details::ToWin32Color(x));
-        #else
-        Stream << Details::ToAnsiColor(x);
-        #endif // MTEST_WINDOWS_PLATFORM
-        return Stream;
-    }
+        SCheckInfo(const EFailType type, const std::string& message, const std::source_location location):
+            Type(type),
+            Message(message),
+            File(Details::FilenameFromPath(location.file_name())),
+            Line(location.line())
+        {
+        }
 
-    class IWriter
+        EFailType GetType() const { return Type; }
+        const std::string& GetMessage() const { return Message; }
+        const std::string& GetFile() const { return File; }
+        std::uint_least32_t GetLine() const { return Line; }
+
+        std::string ToString() const
+        {
+            return std::format("{} {}, File: {}, Line: {}", Details::FailTypeToString(Type), Message, File, Line);
+        }
+
+        EFailType Type;
+        std::string Message;
+        std::string File;
+        std::uint_least32_t Line;
+    };
+
+    class ISink
     {
     public:
-        IWriter() {}
-        virtual ~IWriter() {}
+        ISink() = default;
+        virtual ~ISink() = default;
 
         virtual void Write(const EConsoleColor) = 0;
         virtual void Write(const std::string&) = 0;
     };
 
-    class CStdWriter: public IWriter
+    class CStdSink final: public ISink
     {
     public:
-        void Write(const EConsoleColor x) override { std::cout << x; }
-        void Write(const std::string& x) override { std::cout << x; }
+        void Write(const EConsoleColor x) override
+        {
+            #ifdef MTEST_WINDOWS_PLATFORM
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Details::ColorToWin32(x));
+            #else
+            std::fputs(Details::ColorToAnsi(x).c_str(), stdout);
+            #endif // MTEST_WINDOWS_PLATFORM
+        }
+        void Write(const std::string& x) override { std::fputs(x.c_str(), stdout); }
     };
 
-    class CFileWriter: public IWriter
+    class CFileSink final: public ISink
     {
     public:
-        CFileWriter(const std::string& path):
-            Stream(path)
+        explicit CFileSink(const std::string& path):
+            Handle(std::fopen(path.c_str(), "w"))
         {
         }
-
-        void Write(const EConsoleColor) override
+        ~CFileSink()
         {
-            // Nothing
+            if( Handle )
+            {
+                std::fclose(Handle);
+                Handle = nullptr;
+            }
         }
 
+        void Write(const EConsoleColor) override {}
         void Write(const std::string& x) override
         {
-            if( Stream.is_open() && Stream.good() )
+            if( Handle )
             {
-                Stream << x;
+                std::fputs(x.c_str(), Handle);
             }
         }
     private:
-        std::ofstream Stream;
+        std::FILE* Handle = {};
     };
 
     class CLog final
     {
+    private:
+        CLog() = default;
     public:
+        ~CLog() = default;
+
         static CLog& Instance()
         {
             static CLog Log;
             return Log;
         }
 
-        template<std::derived_from<IWriter> T, class...Args>
-        void AddWriter(Args&&...args)
+        /// Create sink for test output
+        template<std::derived_from<ISink> T, class...Args>
+        void CreateSink(Args&&...args)
         {
-            Writers.emplace_back( std::make_unique<T>(std::forward<Args>(args)...) );
+            Sinks.emplace_back( std::make_unique<T>(std::forward<Args>(args)...) );
         }
 
-        CLog& operator<<(const std::string& Value)
+        CLog& operator<<(const std::string& v)
         {
-            for(const auto& i: Writers)
+            for(const auto& i: Sinks)
             {
-                i->Write(Value);
+                i->Write(v);
             }
             return *this;
         }
 
-        CLog& operator<<(const char* Value)
+        CLog& operator<<(const char* v)
         {
-            for(const auto& i: Writers)
+            for(const auto& i: Sinks)
             {
-                i->Write(Value);
+                i->Write(v);
             }
             return *this;
         }
 
-        CLog& operator<<(const EConsoleColor Value)
+        CLog& operator<<(const EConsoleColor v)
         {
-            for(const auto& i: Writers)
+            for(const auto& i: Sinks)
             {
-                i->Write(Value);
+                i->Write(v);
+            }
+            return *this;
+        }
+
+        CLog& operator<<(const SCheckInfo& v)
+        {
+            const auto temp = v.ToString();
+            for(const auto& i: Sinks)
+            {
+                i->Write(temp);
             }
             return *this;
         }
 
         template<class T>
-        CLog& operator<<(const T& Value)
+        CLog& operator<<(const T& v)
         {
-            for(const auto& i: Writers)
+            const auto temp = std::format("{}", v);
+            for(const auto& i: Sinks)
             {
-                Stream << Value;
-                i->Write(Stream.str());
-                Stream.str({});
-                Stream.clear();
+                i->Write(temp);
             }
             return *this;
         }
     private:
-        std::vector<std::unique_ptr<IWriter>> Writers;
-        std::ostringstream Stream;
+        std::vector<std::unique_ptr<ISink>> Sinks;
     };
 
-    struct SCheckInfo
-    {
-        SCheckInfo(const bool isAssert, const std::string& condition, const std::source_location& location):
-            IsAssert(isAssert),
-            Condition(condition),
-            File(Details::GetFileName(location.file_name())),
-            Line(location.line())
-        {
-        }
-
-        bool IsAssertion() const { return IsAssert; }
-        const std::string& GetCondition() const { return Condition; }
-        const std::string& GetFile() const { return File; }
-        std::uint_least32_t GetLine() const { return Line; }
-
-        //! Gets formated string for display
-        std::string ToString() const
-        {
-            std::ostringstream stream;
-            stream << (IsAssert ? "[Assert ] " : "[Check  ] ") << Condition  << ", File: " << File << ", Line: " << Line;
-            return stream.str();
-        }
-
-        bool IsAssert;
-        std::string Condition;
-        std::string File;
-        std::uint_least32_t Line;
-    };
-
-    inline std::ostream& operator<<(std::ostream& Stream, const SCheckInfo& Info)
-    {
-        Stream << Info.ToString();
-        return Stream;
-    }
-
-    class CTestAssertionException: public std::logic_error
+    class CTestAssertionException final: public std::logic_error
     {
     public:
         CTestAssertionException():
@@ -444,7 +474,7 @@ namespace MTest
         }
     };
 
-    class CTestSkippedException: public std::logic_error
+    class CTestSkippedException final: public std::logic_error
     {
     public:
         CTestSkippedException():
@@ -453,21 +483,21 @@ namespace MTest
         }
     };
 
-    //! Can be used to init some data before each test. Test function has access to its internals (excluding private) - prefer structs (public default access).
+    /// Can be used to init some data before each test. Test function has access to its internals (excluding private) - prefer structs (public default access).
     struct Fixture
     {
         Fixture() = default;
         virtual ~Fixture() = default;
 
-        //! Should return true if test case should be skipped.
+        /// Should return true if test case should be skipped.
         virtual bool Skip() { return false; }
-        //! Use Assertions to check state.
+        /// Use Assertions to check state.
         virtual void Setup() {}
-        //! Cleanup if needed.
+        /// Cleanup if needed.
         virtual void Cleanup() {}
     };
 
-    //! Table test data array
+    /// Table test data array
     template<class T>
     using TableDataArray = std::vector<T>;
     // Type traits
@@ -478,7 +508,7 @@ namespace MTest
     struct IsTableDataArray<TableDataArray<T>>: std::true_type
     {};
 
-    //! Fixture to use with Table tests.
+    /// Fixture to use with Table tests.
     template<class Type, std::derived_from<Fixture> Base>
     struct TableFixture: Base
     {
@@ -488,15 +518,20 @@ namespace MTest
         TableFixture() = default;
         virtual ~TableFixture() = default;
 
-        //! Get Test case name
+        /// Get Test case name
         virtual std::string GenerateName(const DataType&, const std::size_t i) { return std::to_string(i); }
 
-        //! Should return true if test case should be skipped.
+        /// Should return true if test case should be skipped.
         virtual bool Skip(const DataType&) { return BaseClass::Skip(); }
-        //! Use Assertions to check state.
+        using BaseClass::Skip;
+
+        /// Use Assertions to check state.
         virtual void Setup(const DataType&) { BaseClass::Setup(); }
-        //! Cleanup if needed.
+        using BaseClass::Setup;
+
+        /// Cleanup if needed.
         virtual void Cleanup(const DataType&) { BaseClass::Cleanup(); }
+        using BaseClass::Cleanup;
     };
     // Type traits
     // https://en.cppreference.com/w/cpp/types/is_base_of
@@ -505,15 +540,11 @@ namespace MTest
     {
         template<class T, class U>
         std::true_type IsTableFixture(const TableFixture<T, U>*) { return {}; }
-        std::false_type IsTableFixture(const void*) { return {}; }
+        inline std::false_type IsTableFixture(const void*) { return {}; }
     }
     template<class Derived>
     struct IsTableFixture: 
-        std::integral_constant
-        <
-            bool,
-            decltype(Details::IsTableFixture(std::declval<typename std::remove_cv<Derived*>::type>()))::value
-        >
+        std::bool_constant<decltype(Details::IsTableFixture(std::declval<typename std::remove_cv<Derived*>::type>()))::value>
     {};
 
     struct IFixtureWrapper
@@ -528,110 +559,153 @@ namespace MTest
     };
     using FixtureWrapperPtr = std::unique_ptr<IFixtureWrapper>;
 
-    class ITestCase
+    template<class F, class R, class...Args>
+    concept IsInvocable = std::is_invocable_r<R, F, Args...>::value;
+
+    enum class ETestResult
+    {
+        Success,
+        Fail,
+        Skip
+    };
+    namespace Details
+    {
+        inline std::string FormatTime(const float timeInMS)
+        {
+            const bool asSeconds = timeInMS >= 100.0f;
+            return std::format("({:.4f} {})", asSeconds ? timeInMS/1000.0f : timeInMS, asSeconds ? "s" : "ms");
+        }
+    }
+
+    /// Represents one test case
+    class CTestCase final
     {
         using TestClock = std::chrono::steady_clock;
         using TestClockStamp = std::chrono::steady_clock::time_point;
         using TestClockDuration = std::chrono::duration<float, std::milli>;
     public:
-        ITestCase(const std::string& section, const std::string& name, const std::source_location& location, FixtureWrapperPtr&& fixture):
+        CTestCase(const std::string& section, const std::string& name, const std::source_location location, FixtureWrapperPtr fixture):
             Section(section),
             Name(name),
-            File(Details::GetFileName(location.file_name())),
+            File(Details::FilenameFromPath(location.file_name())),
             Line(location.line()),
             Fixture(std::move(fixture))
         {
         }
-        virtual ~ITestCase() = default;
+        ~CTestCase() = default;
 
-        ITestCase(const ITestCase&) = delete;
-        ITestCase& operator=(const ITestCase&) = delete;
+        CTestCase(const CTestCase&) = delete;
+        CTestCase& operator=(const CTestCase&) = delete;
 
-        ITestCase(ITestCase&&) = default;
-        ITestCase& operator=(ITestCase&&) = default;
-
-        virtual void Run() = 0;
+        CTestCase(CTestCase&&) = delete;
+        CTestCase& operator=(CTestCase&&) = delete;
 
         const std::string& GetSection() const { return Section; }
         const std::string& GetName() const { return Name; }
         const std::string& GetFile() const { return File; }
         std::uint_least32_t GetLine() const { return Line; }
-        bool IsFailed() const { return Failed; }
         const std::vector<SCheckInfo>& GetFailedChecks() const { return FailedChecks; }
         const std::optional<SCheckInfo>& GetFailedAssertion() const { return FailedAssertion; }
-        IFixtureWrapper* GetFixture() const { return Fixture.get(); }
-        bool IsSkipped() const { return Skipped; }
+        bool IsFailed() const { return Result == ETestResult::Fail; }
+        bool IsSkipped() const { return Result == ETestResult::Skip; }
+        ETestResult GetResult() const { return Result; }
         float GetDuration() const { return Duration; }
 
         std::string GetDisplayString() const { return MakeDisplayString(Section, Name); }
-        static std::string MakeDisplayString(const std::string& section, const std::string& name)
-        {
-            return section + "." + name;
-        }
+        static std::string MakeDisplayString(const std::string& section, const std::string& name) { return std::format("{}.{}", section, name); }
 
-        //! Returns true when pass
-        bool Check(const std::string& Condition, const bool IsSuccess, const bool IsAssertion, std::source_location Location = std::source_location::current())
-        {
-            if( !IsSuccess )
-            {
-                MarkFailed();
-                const SCheckInfo Info{IsAssertion, Condition, Location};
-                CLog::Instance() << MTest::EConsoleColor::Red << Info << MTest::EConsoleColor::Default << "\n";
-                if( !IsAssertion )
-                {
-                    FailedChecks.push_back(Info);
-                }
-                else
-                {
-                    FailedAssertion = Info;
-                    throw CTestAssertionException{};
-                }
-                return false;
-            }
-            return true;
-        }
-
-        void Skip(const std::string& Reason)
-        {
-            MarkSkipped();
-            CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << Reason << EConsoleColor::Default << "\n";
-            throw CTestSkippedException{};
-        }
-
-        void OnException(const std::string& What)
-        {
-            MarkFailed();
-            CLog::Instance() << EConsoleColor::Red << "[Fatal  ] " << What << EConsoleColor::Default << "\n";
-        }
-
-        void OnExecutionStart()
+        void Run()
         {
             Start = TestClock::now();
             CLog::Instance() << EConsoleColor::Blue << "[Start  ] " << GetDisplayString() << EConsoleColor::Default << "\n";
-        }
-
-        void OnExecutionEnd()
-        {
-            Duration = TestClockDuration(TestClock::now()-Start).count();
-            PrintResult(false);
-        }
-
-        void PrintResult(const bool fromManager)
-        {
-            if( IsFailed() )
+            // Run
+            Runner([&]()
             {
-                CLog::Instance() << EConsoleColor::Red << "[Failure] " << GetDisplayString();
-            }
-            else if( IsSkipped() )
+                if( Fixture->MTest_Skip() )
+                {
+                    Skip("Test case is skipped by Fixture");
+                }
+                Fixture->MTest_Setup();
+                //
+                Fixture->MTest_Run();
+            });
+            // Clear if needed
+            Runner([&]()
             {
-                CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << GetDisplayString();
-            }
-            else
-            {
-                CLog::Instance() << EConsoleColor::Green << "[Success] " << GetDisplayString();
-            }
+                Fixture->MTest_Cleanup();
+            });
             //
-            if( !fromManager )
+            Duration = TestClockDuration(TestClock::now()-Start).count();
+            PrintResult(true);
+        }
+
+        /// Returns true when pass
+        bool Check(const std::string& message, const bool result, const EFailType type, const std::source_location location = std::source_location::current())
+        {
+            if( !result )
+            {
+                HandleFailure(type, message, location);
+            }
+            return result;
+        }
+
+        template<class E, IsInvocable<void> Invocable>
+        void Throw(Invocable invocable, const EFailType type, const std::source_location location = std::source_location::current())
+        {
+            try
+            {
+                invocable();
+                // Failure below (no exception)
+                HandleFailure(type, "Failed with no exception", location);
+            }
+            // Success
+            catch(E&) {}
+            // Failure
+            catch(...)
+            {
+                HandleFailure(type, "Failed with different exception", location);
+            }
+        }
+
+        template<IsInvocable<void> Invocable>
+        void AnyThrow(Invocable invocable, const EFailType type, const std::source_location location = std::source_location::current())
+        {
+            try
+            {
+                invocable();
+                // Failure below (no exception)
+                HandleFailure(type, "Failed with no exception", location);
+            }
+            // Success
+            catch(...) {}
+        }
+
+        template<IsInvocable<void> Invocable>
+        void NoThrow(Invocable invocable, const EFailType type, const std::source_location location = std::source_location::current())
+        {
+            try
+            {
+                invocable();
+                // Success
+            }
+            // Failure
+            catch(...)
+            {
+                HandleFailure(type, "Failed with exception", location);
+            }
+        }
+
+        void Skip(const std::string& reason)
+        {
+            MarkSkipped();
+            CLog::Instance() << EConsoleColor::Magenta << "[Skipped] " << reason << EConsoleColor::Default << "\n";
+            throw CTestSkippedException{};
+        }
+
+        void PrintResult(const bool showTime) const
+        {
+            CLog::Instance() << ResultToColor() << ResultToString() << " " << GetDisplayString();
+            if( showTime )
             {
                 CLog::Instance() << " " << Details::FormatTime(Duration);
             }
@@ -639,308 +713,245 @@ namespace MTest
             {
                 CLog::Instance() << ", File: " << GetFile() << ", Line: " << GetLine();
             }
-            //
             CLog::Instance() << EConsoleColor::Default << "\n";
         }
-    protected:
-        void MarkFailed()
+    private:
+        void MarkFailed() { Result = ETestResult::Fail; }
+        void MarkSkipped() { Result = ETestResult::Skip; }
+
+        void HandleFailure(const EFailType type, const std::string& message, const std::source_location location)
         {
-            Failed = true;
+            MarkFailed();
+            const SCheckInfo info{type, message, location};
+            CLog::Instance() << MTest::EConsoleColor::Red << info << MTest::EConsoleColor::Default << "\n";
+            if( type == EFailType::Check )
+            {
+                FailedChecks.push_back(info);
+            }
+            else
+            {
+                FailedAssertion = info;
+                throw CTestAssertionException{};
+            }
         }
 
-        void MarkSkipped()
+        void HandleException(const std::string& what)
         {
-            Skipped = true;
+            MarkFailed();
+            CLog::Instance() << EConsoleColor::Red << "[Fatal  ] " << what << EConsoleColor::Default << "\n";
         }
 
-        template<class F>
-        void Wrapper(F Function)
+        template<IsInvocable<void> Invocable>
+        void Runner(Invocable invocable)
         {
             try
             {
-                Function();
+                invocable();
             }
             catch(const CTestAssertionException&) {}
             catch(const CTestSkippedException&) {}
-            catch(const std::exception& Exception)
+            catch(const std::exception& e)
             {
-                OnException(Exception.what());
+                HandleException(e.what());
             }
             catch(...)
             {
-                OnException("Unknown");
+                HandleException("Unknown");
             }
         }
-    protected:
+
+        EConsoleColor ResultToColor() const
+        {
+            switch(Result)
+            {
+            case ETestResult::Success:
+                return EConsoleColor::Green;
+            case ETestResult::Fail:
+                return EConsoleColor::Red;
+            case ETestResult::Skip:
+                return EConsoleColor::Magenta;
+            default:
+                return EConsoleColor::Default; // Should not happen
+            }
+        }
+
+        std::string ResultToString() const
+        {
+            switch(Result)
+            {
+            case ETestResult::Success:
+                return "[Success]";
+            case ETestResult::Fail:
+                return "[Failure]";
+            case ETestResult::Skip:
+                return "[Skipped]";
+            default:
+                return "[???????]"; // Should not happen
+            }
+        }
+    private:
         std::string Section;
         std::string Name;
         std::string File;
         std::uint_least32_t Line;
         std::vector<SCheckInfo> FailedChecks;
         std::optional<SCheckInfo> FailedAssertion;
-        bool Failed = false;
+        ETestResult Result = ETestResult::Success;
         FixtureWrapperPtr Fixture;
-        bool Skipped = false;
         TestClockStamp Start = {};
-        float Duration = 0.0f; //! In miliseconds
+        float Duration = 0.0f; // In miliseconds
     };
 
-    //! Common Functionality that can be used to implement eg. Integration Tests
-    class ITestManager
+    /// Manages tests and runs them
+    class CTestManager final
     {
-    public:
-        ITestManager()
+    private:
+        CTestManager()
         {
             #ifdef MTEST_WINDOWS_PLATFORM
             GetConsoleScreenBufferInfo(GetStdHandle(STD_OUTPUT_HANDLE), &csbi);
-            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Details::ToWin32Color(EConsoleColor::Default));
+            SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), Details::ColorToWin32(EConsoleColor::Default));
             #endif // MTEST_WINDOWS_PLATFORM
         }
-
-        virtual ~ITestManager()
+    public:
+        ~CTestManager()
         {
             #ifdef MTEST_WINDOWS_PLATFORM
             SetConsoleTextAttribute(GetStdHandle(STD_OUTPUT_HANDLE), csbi.wAttributes);
             #endif // MTEST_WINDOWS_PLATFORM
         }
 
-        ITestManager(const ITestManager&) = delete;
-        ITestManager& operator=(const ITestManager&) = delete;
+        CTestManager(const CTestManager&) = delete;
+        CTestManager& operator=(const CTestManager&) = delete;
 
-        ITestManager(ITestManager&&) = delete;
-        ITestManager& operator=(ITestManager&&) = delete;
+        CTestManager(CTestManager&&) = delete;
+        CTestManager& operator=(CTestManager&&) = delete;
 
-        virtual void Run() = 0;
-
-        template<std::derived_from<ITestCase> T>
-        void Add(const std::string& Section, const std::string& Name, const std::source_location& location, FixtureWrapperPtr&& fixture)
-        {
-            auto& SectionContainer = Sections[Section];
-            auto It = std::find_if(SectionContainer.begin(), SectionContainer.end(), [&](const std::unique_ptr<ITestCase>& Other)
-            {
-                return Other->GetName() == Name;
-            });
-            if( It != SectionContainer.end() )
-            {
-                CLog::Instance() << EConsoleColor::Red << "[Error  ] " << ITestCase::MakeDisplayString(Section, Name) << " Already Exists"
-                    << EConsoleColor::Default << "\n";
-                return;
-            }
-            auto tmp = std::make_unique<T>(Section, Name, location, std::move(fixture));
-            if( !tmp )
-            {
-                CLog::Instance() << EConsoleColor::Red << "[Error  ] Invalid Test Case in: " << ITestCase::MakeDisplayString(Section, Name) << "\n";
-                return;
-            }
-            SectionContainer.emplace_back(std::move(tmp));
-        }
-
-        void Clear()
-        {
-            Sections.clear();
-            SuccessfulTestCases.clear();
-            FailedTestCases.clear();
-            SkippedTestCases.clear();
-            HasTests = false;
-            SectionTime = 0.0f;
-            TotalTime = 0.0f;
-            SetActiveCase(nullptr);
-        }
-
-        std::size_t GetSectionTestCount(const std::string& section) const
-        {
-            if( !Sections.count(section) )
-            {
-                return 0u;
-            }
-            return Sections.at(section).size();
-        }
-
-        const auto& GetSections() const { return Sections; }
-        bool HasAnyTest() const { return HasTests; }
-        float GetTotalTime() const { return TotalTime; }
-
-        void OnExecutionStart()
-        {
-            // Use literal when migrate to C++23 - 0uz
-            std::size_t testCount = std::accumulate(Sections.begin(), Sections.end(), std::size_t{0}, [](const std::size_t val, const auto& item)
-            {
-                return val + item.second.size();
-            });
-            HasTests = (testCount != 0u);
-            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
-                << Sections.size() << " sections" << EConsoleColor::Default << "\n";
-        }
-
-        void OnSectionStart(const std::string& name)
-        {
-            SectionTime = 0.0f;
-            CLog::Instance() << EConsoleColor::Blue << "[-------] Running section " << name << " which has " << GetSectionTestCount(name) << " tests"
-                << EConsoleColor::Default << "\n";
-        }
-
-        void UpdateStatus(ITestCase* testCase)
-        {
-            if( testCase )
-            {
-                SectionTime += testCase->GetDuration();
-                TotalTime += testCase->GetDuration();
-                if( testCase->IsFailed() )
-                {
-                    FailedTestCases.push_back( testCase );
-                }
-                else if( testCase->IsSkipped() )
-                {
-                    SkippedTestCases.push_back( testCase );
-                }
-                else
-                {
-                    SuccessfulTestCases.push_back( testCase );
-                }
-            }
-        }
-
-        void OnSectionEnd(const std::string& name)
-        {
-            CLog::Instance() << EConsoleColor::Blue << "[-------] Section " << name << " finished " << Details::FormatTime(SectionTime) << EConsoleColor::Default << "\n";
-        }
-
-        void OnExecutionEnd()
-        {
-            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running finished " << Details::FormatTime(TotalTime) << EConsoleColor::Default << "\n";
-            if( HasAnyTest() )
-            {
-                CLog::Instance() << EConsoleColor::Blue << "[Manager] Test summary:" << EConsoleColor::Default << "\n";
-                PrintTestResults(SkippedTestCases, EConsoleColor::Magenta, "Skipped");
-                PrintTestResults(FailedTestCases, EConsoleColor::Red, "Failed");
-                PrintTestResults(SuccessfulTestCases, EConsoleColor::Green, "Successful");
-            }
-            else
-            {
-                CLog::Instance() << EConsoleColor::Blue << "[Manager] No Test Run or Registered" << EConsoleColor::Default << "\n";
-            }
-        }
-
-        void PrintTestResults(const std::vector<ITestCase*>& array, const EConsoleColor color, const std::string& caption)
-        {
-            if( array.size() )
-            {
-                CLog::Instance() << color << "[Manager] " << caption << " Unit Tests: " << array.size() << EConsoleColor::Default << "\n";
-                for(const auto& i: array)
-                {
-                    i->PrintResult(true);
-                }
-            }
-        }
-
-        static void SetActiveCase(ITestCase* testCase)
-        {
-            ActiveCase = testCase;
-        }
-
-        static ITestCase* GetActiveCase()
-        {
-            return ActiveCase;
-        }
-
-        template<std::derived_from<ITestCase> T>
-        static T* GetActiveCaseAs()
-        {
-            return dynamic_cast<T*>(ActiveCase);
-        }
-    protected:
-        std::unordered_map<std::string, std::vector<std::unique_ptr<ITestCase>>> Sections;
-        std::vector<ITestCase*> SuccessfulTestCases;
-        std::vector<ITestCase*> FailedTestCases;
-        std::vector<ITestCase*> SkippedTestCases;
-        bool HasTests = false;
-        float SectionTime = 0.0f;
-        float TotalTime = 0.0f;
-        static inline ITestCase* ActiveCase = nullptr;
-    private:
-        #ifdef MTEST_WINDOWS_PLATFORM
-        CONSOLE_SCREEN_BUFFER_INFO csbi;
-        #endif // MTEST_WINDOWS_PLATFORM
-    };
-
-    //! Unit test manager
-    class CTestManager final: public ITestManager
-    {
-    public:
-        class CUnitTest final: public ITestCase
-        {
-        public:
-            CUnitTest(const std::string& section, const std::string& name, const std::source_location& location, FixtureWrapperPtr&& fixture):
-                ITestCase(section, name, location, std::move(fixture))
-            {
-            }
-
-            void Run() override
-            {
-                OnExecutionStart();
-                // Run
-                Wrapper([&]()
-                {
-                    if( Fixture->MTest_Skip() )
-                    {
-                        Skip("Test case is skipped by Fixture");
-                    }
-                    Fixture->MTest_Setup();
-                    //
-                    Fixture->MTest_Run();
-                });
-                // Clear if needed
-                Wrapper([&]()
-                {
-                    Fixture->MTest_Cleanup();
-                });
-                //
-                OnExecutionEnd();
-            }
-        };
-    public:
         static CTestManager& Instance()
         {
             static CTestManager Manager;
             return Manager;
         }
 
-        void Run() override
+        CTestCase* GetActiveTest() const { return ActiveTest; }
+
+        void AddTest(const std::string& section, const std::string& name, const std::source_location location, FixtureWrapperPtr fixture)
         {
-            OnExecutionStart();
-            CLog::Instance() << "\n";
-            for(const auto& i: Sections)
+            auto& sectionTests = Tests[section];
+            auto it = std::find_if(sectionTests.begin(), sectionTests.end(), [&](const std::unique_ptr<CTestCase>& other)
             {
-                OnSectionStart(i.first);
+                return other->GetName() == name;
+            });
+            if( it != sectionTests.end() )
+            {
+                CLog::Instance() << EConsoleColor::Red << "[Error  ] " << CTestCase::MakeDisplayString(section, name) << " Already Exists"
+                    << EConsoleColor::Default << "\n";
+                return;
+            }
+            sectionTests.push_back(std::make_unique<CTestCase>(section, name, location, std::move(fixture)));
+        }
+
+        int Run()
+        {
+            // Use literal when migrate to C++23 - 0uz
+            std::size_t testCount = std::accumulate
+            (
+                Tests.begin(), Tests.end(), std::size_t{0},
+                [](const std::size_t val, const auto& item)
+                {
+                    return val+item.second.size();
+                }
+            );
+            std::vector<CTestCase*> failedTests;
+            std::vector<CTestCase*> skippedTests;
+            std::vector<CTestCase*> successfulTests;
+            float totalTime{0.0f};
+            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running " << testCount  << " tests grouped into "
+                << Tests.size() << " sections" << EConsoleColor::Default << "\n\n";
+            for(const auto& i: Tests)
+            {
+                float sectionTime{0.0f};
+                CLog::Instance() << EConsoleColor::Blue << "[-------] Running section " << i.first << " which has " 
+                    << i.second.size() << " tests" << EConsoleColor::Default << "\n";
                 for(const auto& j: i.second)
                 {
                     auto testCase = j.get();
-                    SetActiveCase(testCase);
+                    ActiveTest = testCase;
                     testCase->Run();
-                    SetActiveCase(nullptr);
-                    //
-                    UpdateStatus(testCase);
+                    ActiveTest = nullptr;
+                    // Update result
+                    sectionTime += testCase->GetDuration();
+                    if( testCase->IsFailed() )
+                    {
+                        failedTests.push_back(testCase);
+                    }
+                    else if( testCase->IsSkipped() )
+                    {
+                        skippedTests.push_back(testCase);
+                    }
+                    else
+                    {
+                        successfulTests.push_back(testCase);
+                    }
                 }
-                OnSectionEnd(i.first);
-                CLog::Instance() << "\n";
+                CLog::Instance() << EConsoleColor::Blue << "[-------] Section " << i.first << " finished "
+                    << Details::FormatTime(sectionTime) << EConsoleColor::Default << "\n\n";
+                totalTime += sectionTime;
             }
-            OnExecutionEnd();
-            //
-            Clear();
+            // Print result
+            CLog::Instance() << EConsoleColor::Blue << "[Manager] Running finished " << Details::FormatTime(totalTime) << EConsoleColor::Default << "\n";
+            if( testCount != std::size_t{0} )
+            {
+                // Print failed or skipped tests for quick lookup
+                if( !failedTests.empty() || !skippedTests.empty() )
+                {
+                    CLog::Instance() << EConsoleColor::Blue << "[Manager] Test list:" << EConsoleColor::Default << "\n";
+                    PrintResult(failedTests);
+                    PrintResult(skippedTests);
+                }
+                CLog::Instance() << EConsoleColor::Blue << "[Manager] Test summary:" << EConsoleColor::Default << "\n";
+                PrintSummary(successfulTests, EConsoleColor::Green, "Successful");
+                PrintSummary(failedTests, EConsoleColor::Red, "Failed");
+                PrintSummary(skippedTests, EConsoleColor::Magenta, "Skipped");
+            }
+            else
+            {
+                CLog::Instance() << EConsoleColor::Blue << "[Manager] No Test Run or Registered" << EConsoleColor::Default << "\n";
+            }
+            Tests.clear();
+            // Return
+            return failedTests.empty() ? EXIT_SUCCESS : EXIT_FAILURE;
         }
     private:
-        CTestManager() = default;
-        ~CTestManager() = default;
+        void PrintResult(const std::vector<CTestCase*>& array)
+        {
+            for(const auto* i: array)
+            {
+                i->PrintResult(false);
+            }
+        }
+
+        void PrintSummary(const std::vector<CTestCase*>& array, const EConsoleColor color, const std::string& caption)
+        {
+            if( array.size() )
+            {
+                CLog::Instance() << color << "[Manager] " << caption << " tests: " << array.size() << EConsoleColor::Default << "\n";
+            }
+        }
+    private:
+        std::unordered_map<std::string, std::vector<std::unique_ptr<CTestCase>>> Tests;
+        CTestCase* ActiveTest = nullptr;
+        #ifdef MTEST_WINDOWS_PLATFORM
+        CONSOLE_SCREEN_BUFFER_INFO csbi;
+        #endif // MTEST_WINDOWS_PLATFORM
     };
 
-    struct SRegistrar
+    struct Registrar final
     {
-        SRegistrar(const std::function<void()>& callback)
+        template<IsInvocable<void> Invocable>
+        explicit Registrar(Invocable invocable)
         {
-            if( callback )
-            {
-                callback();
-            }
+            invocable();
         }
     };
 }

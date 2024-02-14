@@ -41,6 +41,9 @@ Aviable assertions are showcased here:
 | MTEST_CHECK_NOT_VALUE | No | Check if both values are different |
 | MTEST_CHECK_NULL | No | Check if pointer is null |
 | MTEST_CHECK_NOT_NULL | No | Check if pointer is not null |
+| MTEST_CHECK_THROW | No | Check if exception of given type is throw |
+| MTEST_CHECK_ANY_THROW | No | Check if any exception is throw |
+| MTEST_CHECK_NO_THROW | No | Check if no exception is throw |
 | MTEST_ASSERT | Yes | Must evalute to true |
 | MTEST_ASSERT_TRUE | Yes | As above |
 | MTEST_ASSERT_FALSE | Yes | Must evalute to false |
@@ -48,6 +51,9 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_NOT_VALUE | Yes | Check if both values are different |
 | MTEST_ASSERT_NULL | Yes | Check if pointer is null |
 | MTEST_ASSERT_NOT_NULL | Yes | Check if pointer is not null |
+| MTEST_ASSERT_THROW | Yes | Check if exception of given type is throw |
+| MTEST_ASSERT_ANY_THROW | Yes | Check if any exception is throw |
+| MTEST_ASSERT_NO_THROW | Yes | Check if no exception is throw |
 
 ### Fixtures
 You can use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:
@@ -140,7 +146,7 @@ MTEST_UNIT_TEST_F_T(MathTest, EnigmaticFunction, MathTestDataArray)
 }
 ```
 ## Example output
-![alt text](Output.png "Example (PowerShell) output.") 
+![alt text](Output.png "Example (Console) output.") 
 ## Example
 See [Main.cpp](Example/Main.cpp)
 ## License
