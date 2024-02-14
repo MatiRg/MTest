@@ -67,7 +67,7 @@ SOFTWARE.
 #define MTEST_IMPL_CHECK_NOT_VALUE(Value, Wanted, Type) MTEST_IMPL_CHECK_TRUE(Value != Wanted, Type)
 #define MTEST_IMPL_CHECK_NULL(Value, Type) MTEST_IMPL_CHECK_VALUE(Value, nullptr, Type)
 #define MTEST_IMPL_CHECK_NOT_NULL(Value, Type) MTEST_IMPL_CHECK_NOT_VALUE(Value, nullptr, Type)
-#define MTEST_IMPL_CHECK_THROW(Statement, Exception, Type) MTest::CTestManager::Instance().GetActiveTest()->Throw< Exception >( [&](){ Statement; }, Type )
+#define MTEST_IMPL_CHECK_THROW(Statement, Exception, Type) MTest::CTestManager::Instance().GetActiveTest()->Throw<Exception>( [&](){ Statement; }, Type )
 #define MTEST_IMPL_CHECK_ANY_THROW(Statement, Type) MTest::CTestManager::Instance().GetActiveTest()->AnyThrow( [&](){ Statement; }, Type )
 #define MTEST_IMPL_CHECK_NO_THROW(Statement, Type) MTest::CTestManager::Instance().GetActiveTest()->NoThrow( [&](){ Statement; }, Type )
 
@@ -186,10 +186,9 @@ namespace \
     { \
         []() \
         { \
-            auto fixture = std::make_unique<ConcreteFixture>(); \
             MTest::CTestManager::Instance().AddTest \
             ( \
-                #Section, #Name, std::source_location::current(), std::move(fixture) \
+                #Section, #Name, std::source_location::current(), std::make_unique<ConcreteFixture>() \
             ); \
         } \
     }; \
@@ -539,12 +538,11 @@ namespace MTest
     namespace Details
     {
         template<class T, class U>
-        std::true_type IsTableFixture(const TableFixture<T, U>*) { return {}; }
-        inline std::false_type IsTableFixture(const void*) { return {}; }
+        constexpr std::true_type IsTableFixture(const TableFixture<T, U>*) { return {}; }
+        constexpr std::false_type IsTableFixture(const void*) { return {}; }
     }
     template<class Derived>
-    struct IsTableFixture: 
-        std::bool_constant<decltype(Details::IsTableFixture(std::declval<typename std::remove_cv<Derived*>::type>()))::value>
+    struct IsTableFixture: std::bool_constant<decltype(Details::IsTableFixture(std::declval<typename std::remove_cv<Derived*>::type>()))::value>
     {};
 
     struct IFixtureWrapper
