@@ -39,6 +39,8 @@ SOFTWARE.
 #include <cstdlib>
 #include <cstdio>
 #include <format>
+#include <cmath>
+#include <limits>
 
 #if defined(_WIN64) || defined(_WIN32) || defined(WIN32)
     #define MTEST_WINDOWS_PLATFORM 1
@@ -70,6 +72,7 @@ SOFTWARE.
 #define MTEST_IMPL_CHECK_THROW(Statement, Exception, Type) MTest::CTestManager::Instance().GetActiveTest()->Throw<Exception>( [&](){ Statement; }, Type )
 #define MTEST_IMPL_CHECK_ANY_THROW(Statement, Type) MTest::CTestManager::Instance().GetActiveTest()->AnyThrow( [&](){ Statement; }, Type )
 #define MTEST_IMPL_CHECK_NO_THROW(Statement, Type) MTest::CTestManager::Instance().GetActiveTest()->NoThrow( [&](){ Statement; }, Type )
+#define MTEST_IMPL_CHECK_NEAR(Value, Wanted, Epsilon, Type) MTEST_IMPL_CHECK_TRUE(MTest::Equal(Value, Wanted, Epsilon), Type)
 
 /// It must evaluate to true statement, if not test will fail but will continue execution.
 #define MTEST_CHECK_TRUE(Condition) MTEST_IMPL_CHECK_TRUE(Condition, MTest::EFailType::Check)
@@ -91,6 +94,8 @@ SOFTWARE.
 #define MTEST_CHECK_ANY_THROW(Statement) MTEST_IMPL_CHECK_ANY_THROW(Statement, MTest::EFailType::Check)
 /// Check if exception is not throw
 #define MTEST_CHECK_NO_THROW(Statement) MTEST_IMPL_CHECK_NO_THROW(Statement, MTest::EFailType::Check)
+/// Check if floating point is near given value
+#define MTEST_CHECK_NEAR(Value, Wanted, Epsilon) MTEST_IMPL_CHECK_NEAR(Value, Wanted, Epsilon, MTest::EFailType::Check)
 
 /// Must evaluate to true statement, if not test will fail and will exit.
 #define MTEST_ASSERT_TRUE(Condition) MTEST_IMPL_CHECK_TRUE(Condition, MTest::EFailType::Assert)
@@ -112,6 +117,8 @@ SOFTWARE.
 #define MTEST_ASSERT_ANY_THROW(Statement) MTEST_IMPL_CHECK_ANY_THROW(Statement, MTest::EFailType::Assert)
 /// Check if exception is not throw
 #define MTEST_ASSERT_NO_THROW(Statement) MTEST_IMPL_CHECK_NO_THROW(Statement, MTest::EFailType::Assert)
+/// Check if floating point is near given value
+#define MTEST_ASSERT_NEAR(Value, Wanted, Epsilon) MTEST_IMPL_CHECK_NEAR(Value, Wanted, Epsilon, MTest::EFailType::Assert)
 
 //// Logs & Utility
 
@@ -308,10 +315,7 @@ namespace MTest
             {
                 return path;
             }
-            else
-            {
-                return path.substr(idx+1u);
-            }
+            return path.substr(idx+1u);
         }
     }
 
@@ -952,4 +956,16 @@ namespace MTest
             invocable();
         }
     };
+
+    template<std::floating_point T>
+    inline constexpr T EPSILON = std::numeric_limits<T>::epsilon();
+
+    template<std::floating_point T>
+    inline constexpr T EPSILON_SMALL = T{0.0001};
+
+    template<std::floating_point T>
+    bool Equal(const T value, const T wanted, const T epsilon)
+    {
+        return std::abs(value-wanted) < epsilon;
+    }
 }

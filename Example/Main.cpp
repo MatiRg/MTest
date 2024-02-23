@@ -35,6 +35,9 @@ MTEST_UNIT_TEST(Basic, Hello)
     int b = 3;
     /// Must evaluate to true statement, if not test will fail and will exit.
     MTEST_ASSERT( (a+b) == 10 );
+    /// Check floating point is equal
+    float f1{3.0f};
+    MTEST_CHECK_NEAR(f1, 3.0f, MTest::EPSILON_SMALL<float>);
 }
 
 MTEST_UNIT_TEST(Basic, HelloFail)

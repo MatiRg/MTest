@@ -44,6 +44,7 @@ Aviable assertions are showcased here:
 | MTEST_CHECK_THROW | No | Check if exception of given type is throw |
 | MTEST_CHECK_ANY_THROW | No | Check if any exception is throw |
 | MTEST_CHECK_NO_THROW | No | Check if no exception is throw |
+| MTEST_CHECK_NEAR | No | Check if floating point is near given value |
 | MTEST_ASSERT | Yes | Must evalute to true |
 | MTEST_ASSERT_TRUE | Yes | As above |
 | MTEST_ASSERT_FALSE | Yes | Must evalute to false |
@@ -54,6 +55,7 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_THROW | Yes | Check if exception of given type is throw |
 | MTEST_ASSERT_ANY_THROW | Yes | Check if any exception is throw |
 | MTEST_ASSERT_NO_THROW | Yes | Check if no exception is throw |
+| MTEST_ASSERT_NEAR | Yes | Check if floating point is near given value |
 
 ### Fixtures
 You can use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:
