@@ -1,6 +1,6 @@
 # MIT License
 # 
-# Copyright (c) 2024 Mateusz Rugor
+# Copyright (c) 2025 Mateusz Rugor
 # 
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
@@ -19,23 +19,19 @@
 # LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
-cmake_minimum_required(VERSION 3.5)
+cmake_minimum_required(VERSION 3.21)
 project(MTest LANGUAGES CXX)
 
 if(CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR)
 	message(FATAL_ERROR "In-source builds are not permitted.")
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-	message(STATUS "Detected Clang compiler")
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
 	message(STATUS "Detected GCC compiler")
-elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "MSVC")
-	message(STATUS "Detected MSVC compiler")
 else()
 	message(FATAL_ERROR "Unsupported compiler.")
 endif()
@@ -46,12 +42,4 @@ set(SOURCES_EXAMPLES
 )
 add_executable(Example ${SOURCES_EXAMPLES})
 
-if(CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-    target_compile_options(Example PRIVATE -Wall -Wextra -Wunreachable-code -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-cast-function-type -Winit-self -Wimplicit-fallthrough)
-endif()
-if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    target_compile_options(Example PRIVATE -Wall -Wextra -Wunreachable-code -Wpedantic -Wweak-vtables -Wexit-time-destructors -Wglobal-constructors -Wmissing-noreturn)
-endif()
-if(CMAKE_CXX_COMPILER_ID MATCHES "MSVC")
-    target_compile_options(Example PRIVATE /W4 /w44265 /w44062 /wd4201 /wd4458 /wd4996 /wd4244 /wd4061 /wd4456 /wd4457 /wd4701 /wd4267 /wd4245 /wd4100)
-endif()
+target_compile_options(Example PRIVATE -Wall -Wextra -Wunreachable-code -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-cast-function-type -Winit-self -Wimplicit-fallthrough)

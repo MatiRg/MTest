@@ -1,5 +1,5 @@
 # MTest 
-MTest is small, quick and dirty, header-only C++20 Unit Test library inspired by Catch2 nad gtest.
+MTest is small, quick and dirty, header-only C++23 Unit Test library inspired by Catch2 nad gtest.
 ## Installing
 Copy MTest.hpp to your source dir.
 After that include header and you are good to go.
@@ -18,11 +18,12 @@ After that you can define test body.
 MTEST_UNIT_TEST(SectionName, UniqueTestName)
 {
     int a = CalculateSomething();
-    MTEST_CHECK(a == 7);
-    MTEST_ASSERT(a > 0);
+    MTEST_CHECK_TRUE(a == 7);
+    MTEST_CHECK_VALUE(a, 7);
+    MTEST_ASSERT_TRUE(a > 0);
 }
 ```
-In final step in one source file you need to define `main()`, use `MTEST_MAIN` macro.
+In final step in one source file you need to define `int main(int argc, char* argv[])`, use `MTEST_MAIN` macro.
 ```C++
 MTEST_MAIN
 ```
@@ -34,28 +35,28 @@ Aviable assertions are showcased here:
 
 | Type | Break execution | Notes |
 | - | - | - |
-| MTEST_CHECK | No | Must evalute to true |
-| MTEST_CHECK_TRUE | No | As above |
+| MTEST_CHECK_TRUE | No | Must evalute to true |
 | MTEST_CHECK_FALSE | No | Must evalute to false |
 | MTEST_CHECK_VALUE | No | Check if both values are the same |
 | MTEST_CHECK_NOT_VALUE | No | Check if both values are different |
 | MTEST_CHECK_NULL | No | Check if pointer is null |
 | MTEST_CHECK_NOT_NULL | No | Check if pointer is not null |
+| MTEST_CHECK_NEAR | No | Check if floating point is near given value |
 | MTEST_CHECK_THROW | No | Check if exception of given type is throw |
 | MTEST_CHECK_ANY_THROW | No | Check if any exception is throw |
 | MTEST_CHECK_NO_THROW | No | Check if no exception is throw |
-| MTEST_CHECK_NEAR | No | Check if floating point is near given value |
-| MTEST_ASSERT | Yes | Must evalute to true |
-| MTEST_ASSERT_TRUE | Yes | As above |
+| MTEST_CHECK_CUSTOM | No | Check for user defined verification |
+| MTEST_ASSERT_TRUE | Yes | Must evalute to true |
 | MTEST_ASSERT_FALSE | Yes | Must evalute to false |
 | MTEST_ASSERT_VALUE | Yes | Check if both values are the same |
 | MTEST_ASSERT_NOT_VALUE | Yes | Check if both values are different |
 | MTEST_ASSERT_NULL | Yes | Check if pointer is null |
 | MTEST_ASSERT_NOT_NULL | Yes | Check if pointer is not null |
+| MTEST_ASSERT_NEAR | Yes | Check if floating point is near given value |
 | MTEST_ASSERT_THROW | Yes | Check if exception of given type is throw |
 | MTEST_ASSERT_ANY_THROW | Yes | Check if any exception is throw |
 | MTEST_ASSERT_NO_THROW | Yes | Check if no exception is throw |
-| MTEST_ASSERT_NEAR | Yes | Check if floating point is near given value |
+| MTEST_ASSERT_CUSTOM | Yes | Check for user defined verification |
 
 ### Fixtures
 You can use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:
@@ -147,6 +148,36 @@ MTEST_UNIT_TEST_F_T(MathTest, EnigmaticFunction, MathTestDataArray)
     CheckWork(testData.Arg1, testData.Arg2, testData.Result);
 }
 ```
+### User defined check
+User can define their own check/assert macro to accommodate custom type. First step is to define check function:
+```C++
+template<class T>
+MTest::CheckResult MyCheck(const T& value, const T& wanted)
+{
+    if( value == wanted )
+    {
+        return MTest::CheckSuccess(); // Verification success
+    }
+    // Verification failure
+    return MTest::CheckFailure("My check should be {} but is {}", value, wanted);
+}
+```
+After that best way to use them is to define helper macros:
+```C++
+#define MY_CHECK(Value, Wanted) MTEST_CHECK_CUSTOM(MyCheck(Value, Wanted))
+#define MY_ASSERT(Value, Wanted) MTEST_ASSERT_CUSTOM(MyCheck(Value, Wanted))
+```
+And finally we can use these new assertions in simple way:
+```C++
+MTEST_UNIT_TEST(User, Sample)
+{
+    int a = 7;
+    MY_CHECK(a, 7);
+    MY_ASSERT(a, 7);
+}
+```
+### Command line options
+Test can be skipped (filtered out) by command line: `./Tests.exe -F=Selected` only test that full name contains `Selected` will be run.
 ## Example output
 ![alt text](Output.png "Example (Console) output.") 
 ## Example
