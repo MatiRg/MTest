@@ -42,4 +42,5 @@ set(SOURCES_EXAMPLES
 )
 add_executable(Example ${SOURCES_EXAMPLES})
 
-target_compile_options(Example PRIVATE -Wall -Wextra -Wunreachable-code -Wpedantic -Wshadow -Wnon-virtual-dtor -Wno-cast-function-type -Winit-self -Wimplicit-fallthrough)
+target_compile_options(Example PRIVATE -Wall -Wextra -Wpedantic -Wshadow -Wnon-virtual-dtor -Wold-style-cast -Woverloaded-virtual
+        -Wlogical-op -Wredundant-decls -Wconversion -Wsign-conversion -Warith-conversion -Wcast-qual)

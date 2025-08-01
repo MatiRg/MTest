@@ -343,7 +343,10 @@ namespace MTest
         void SetColor_Windows(WORD color)
         {
             constexpr WORD COLOR_MASK = 0x000F;
-            const WORD newAttributes = (ConsoleAttributes & ~COLOR_MASK) | (color & COLOR_MASK);
+            // Integer promotion when use smaller types.
+            // See: https://wiki.sei.cmu.edu/confluence/display/c/EXP14-C.+Beware+of+integer+promotion+when+performing+bitwise+operations+on+integer+types+smaller+than+int
+            constexpr WORD INV_COLOR_MASK = static_cast<WORD>(~COLOR_MASK);
+            const WORD newAttributes = (ConsoleAttributes & INV_COLOR_MASK) | (color & COLOR_MASK);
             std::ignore = SetConsoleTextAttribute(Handle, newAttributes);
         }
     private:
