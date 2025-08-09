@@ -42,6 +42,9 @@ MTEST_UNIT_TEST(Basic, Hello)
     // Compare pointer values.
     int* aa = &a;
     int* bb = &b;
+    int* cc = nullptr;
+    MTEST_CHECK_NOT_NULL(aa);
+    MTEST_CHECK_NULL(cc);
     // Pointers must be equal (it does not compare values).
     MTEST_CHECK_POINTER(aa, &a);
     // Pointers must not be equal (it does not compare values).
@@ -53,6 +56,14 @@ MTEST_UNIT_TEST(Basic, HelloFail)
 {
     int a = 7;
     int b = 3;
+    // Compare pointer values.
+    int* aa = &a;
+    int* bb = &b;
+    int* cc = nullptr;
+    MTEST_CHECK_NULL(aa);
+    MTEST_CHECK_NOT_NULL(cc);
+    MTEST_CHECK_POINTER(aa, bb);
+    MTEST_CHECK_POINTER(aa, nullptr);
     // Must not be equal, if not test will fail and will exit.
     MTEST_ASSERT_NOT_VALUE(a+b, 10);
 }

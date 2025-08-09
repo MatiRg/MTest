@@ -248,6 +248,9 @@ namespace MTest
     template<class T>
     concept IsEnumeration = std::is_enum_v<T>;
 
+    template<class T>
+    concept IsPointerType = std::is_pointer_v<T> || std::is_null_pointer_v<T>; 
+
     enum class EConsoleColor
     {
         Default,
@@ -626,13 +629,28 @@ namespace MTest
             {
                 return path;
             }
-            return path.substr(idx+1u);
+            return path.substr(idx + 1uz);
         }
 
         inline std::string FormatTime(const float timeInMS)
         {
             const bool asSeconds = timeInMS >= 100.0f;
-            return std::format("({:.4f} {})", asSeconds ? timeInMS/1000.0f : timeInMS, asSeconds ? "s" : "ms");
+            return std::format("({:.4f} {})", asSeconds ? timeInMS / 1000.0f : timeInMS, asSeconds ? "s" : "ms");
+        }
+
+        template<IsPointerType T>
+        std::string FormatPointer(const T& pointer)
+        {
+            if constexpr(std::is_null_pointer_v<T>)
+            {
+                // It maybe special std::nullptr_t type in this case just return null.
+                return "null";
+            }
+            else
+            {
+                // If pointer is nullptr then return null and if not convert pointer to string.
+                return pointer == nullptr ? "null" : std::format("{}", static_cast<const void*>(pointer));
+            }
         }
     }
 
@@ -786,31 +804,31 @@ namespace MTest
             return false;
         }
 
-        template<class T>
-        bool CheckPointer(const T* value, const T* wanted, const std::string& message, const EFailType type,
+        template<IsPointerType T, IsPointerType U>
+        bool CheckPointer(const T& value, const U& wanted, const std::string& message, const EFailType type,
             const std::source_location location = std::source_location::current())
         {
             if( value == wanted )
             {
                 return true;
             }
-            HandleFailure(std::format("Pointer '{}' should be {}", message, static_cast<const void*>(wanted)), type, location);
+            HandleFailure(std::format("Pointer '{}' should be {}", message, Details::FormatPointer(wanted)), type, location);
             return false;
         }
 
-        template<class T>
-        bool CheckNotPointer(const T* value, const T* wanted, const std::string& message, const EFailType type,
+        template<IsPointerType T, IsPointerType U>
+        bool CheckNotPointer(const T& value, const U& wanted, const std::string& message, const EFailType type,
             const std::source_location location = std::source_location::current())
         {
             if( value != wanted )
             {
                 return true;
             }
-            HandleFailure(std::format("Pointer '{}' should not be {}", message, static_cast<const void*>(wanted)), type, location);
+            HandleFailure(std::format("Pointer '{}' should not be {}", message, Details::FormatPointer(wanted)), type, location);
             return false;
         }
 
-        template<class T>
+        template<IsPointerType T>
         bool CheckNull(const T& pointer, const std::string& message, const EFailType type, const std::source_location location = std::source_location::current())
         {
             if( pointer == nullptr )
@@ -821,7 +839,7 @@ namespace MTest
             return false;
         }
 
-        template<class T>
+        template<IsPointerType T>
         bool CheckNotNull(const T& pointer, const std::string& message, const EFailType type, const std::source_location location = std::source_location::current())
         {
             if( pointer != nullptr )
@@ -856,7 +874,7 @@ namespace MTest
         bool CheckNear(const T& value, const T& wanted, const T& epsilon, const std::string& message, const EFailType type,
             const std::source_location location = std::source_location::current())
         {
-            if( std::abs(value-wanted) < epsilon )
+            if( std::abs(value - wanted) < epsilon )
             {
                 return true;
             }

@@ -1,7 +1,7 @@
 # MTest 
 MTest is small, quick and dirty, header-only C++23 Unit Test library inspired by Catch2 nad gtest.
 ## Installing
-Copy MTest.hpp to your source dir.
+Copy MTest.hpp to your source dir.  
 After that include header and you are good to go.
 ## Documentation
 ### Test basic
@@ -23,9 +23,21 @@ MTEST_UNIT_TEST(SectionName, UniqueTestName)
     MTEST_ASSERT_TRUE(a > 0);
 }
 ```
-In final step in one source file you need to define `int main(int argc, char* argv[])`, use `MTEST_MAIN` macro.
+Final step is to define in one source file main function, you can use `MTEST_MAIN` macro.
 ```C++
 MTEST_MAIN
+```
+Or you can write it like this (without macro):
+```C++
+int main(int argc, char* argv[])
+{
+    // This will create console logger (with colors).
+    MTest::GetLog().CreateSink<MTest::CStdSink>();
+    // This will create file logger.
+    MTest::GetLog().CreateSink<MTest::CFileSink>("Output.txt");
+    // Run tests.
+	return MTest::GetTestManager().Run(argc, argv) ? 0 : 1;
+}
 ```
 Test can use various assertion divide into two groups:
 * Check group - these will fail test and continue execution of given test
