@@ -39,6 +39,8 @@ Aviable assertions are showcased here:
 | MTEST_CHECK_FALSE | No | Must evalute to false |
 | MTEST_CHECK_VALUE | No | Check if both values are the same |
 | MTEST_CHECK_NOT_VALUE | No | Check if both values are different |
+| MTEST_CHECK_POINTER | No | Check if both pointers are the same |
+| MTEST_CHECK_NOT_POINTER | No | Check if both pointers are different |
 | MTEST_CHECK_NULL | No | Check if pointer is null |
 | MTEST_CHECK_NOT_NULL | No | Check if pointer is not null |
 | MTEST_CHECK_NEAR | No | Check if floating point is near given value |
@@ -50,6 +52,8 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_FALSE | Yes | Must evalute to false |
 | MTEST_ASSERT_VALUE | Yes | Check if both values are the same |
 | MTEST_ASSERT_NOT_VALUE | Yes | Check if both values are different |
+| MTEST_ASSERT_POINTER | Yes | Check if both pointers are the same |
+| MTEST_ASSERT_NOT_POINTER | Yes | Check if both pointers are different |
 | MTEST_ASSERT_NULL | Yes | Check if pointer is null |
 | MTEST_ASSERT_NOT_NULL | Yes | Check if pointer is not null |
 | MTEST_ASSERT_NEAR | Yes | Check if floating point is near given value |

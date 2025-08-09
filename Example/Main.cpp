@@ -39,6 +39,14 @@ MTEST_UNIT_TEST(Basic, Hello)
     // Check floating point is equal (near given value).
     float f = 3.0f;
     MTEST_CHECK_NEAR(f, 3.0f, MTest::EPSILON_SMALL<float>);
+    // Compare pointer values.
+    int* aa = &a;
+    int* bb = &b;
+    // Pointers must be equal (it does not compare values).
+    MTEST_CHECK_POINTER(aa, &a);
+    // Pointers must not be equal (it does not compare values).
+    MTEST_CHECK_NOT_POINTER(aa, nullptr);
+    MTEST_CHECK_NOT_POINTER(aa, bb);
 }
 
 MTEST_UNIT_TEST(Basic, HelloFail)
