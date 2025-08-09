@@ -67,6 +67,8 @@ SOFTWARE.
 #define MTEST_INTERNAL_CHECK_FALSE(Condition, Type) MTest::GetTestManager().GetActiveTest()->CheckFalse( Condition, #Condition, Type )
 #define MTEST_INTERNAL_CHECK_VALUE(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckEqual( Value, Wanted, #Value, Type )
 #define MTEST_INTERNAL_CHECK_NOT_VALUE(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckNotEqual( Value, Wanted, #Value, Type )
+#define MTEST_INTERNAL_CHECK_POINTER(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckPointer( Value, Wanted, #Value, Type )
+#define MTEST_INTERNAL_CHECK_NOT_POINTER(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckNotPointer( Value, Wanted, #Value, Type )
 #define MTEST_INTERNAL_CHECK_NULL(Value, Type) MTest::GetTestManager().GetActiveTest()->CheckNull( Value, #Value, Type )
 #define MTEST_INTERNAL_CHECK_NOT_NULL(Value, Type) MTest::GetTestManager().GetActiveTest()->CheckNotNull( Value, #Value, Type )
 #define MTEST_INTERNAL_CHECK_NEAR(Value, Wanted, Epsilon, Type) MTest::GetTestManager().GetActiveTest()->CheckNear( Value, Wanted, Epsilon, #Value, Type )
@@ -75,50 +77,58 @@ SOFTWARE.
 #define MTEST_INTERNAL_CHECK_NO_THROW(Statement, Type) MTest::GetTestManager().GetActiveTest()->CheckNoThrow( [&](){ Statement; }, #Statement, Type )
 #define MTEST_INTERNAL_CHECK_CUSTOM(Result, Type) MTest::GetTestManager().GetActiveTest()->CheckCustom( Result, Type )
 
-/// It must evaluate to true statement, if not test will fail but will continue execution.
+/// It must evaluate to true statement, if not test will fail and continue execution.
 #define MTEST_CHECK_TRUE(Condition) MTEST_INTERNAL_CHECK_TRUE(Condition, MTest::EFailType::Check)
-/// It must evaluate to false statement, if not test will fail but will continue execution.
+/// It must evaluate to false statement, if not test will fail and continue execution.
 #define MTEST_CHECK_FALSE(Condition) MTEST_INTERNAL_CHECK_FALSE(Condition, MTest::EFailType::Check)
-/// It must evaluate to true statement, if not test will fail but will continue execution.
+/// It must evaluate to true statement, if not test will fail and continue execution.
 #define MTEST_CHECK_VALUE(Value, Wanted) MTEST_INTERNAL_CHECK_VALUE(Value, Wanted, MTest::EFailType::Check)
-/// It must evaluate to true statement, if not test will fail but will continue execution.
+/// It must evaluate to true statement, if not test will fail and continue execution.
 #define MTEST_CHECK_NOT_VALUE(Value, Wanted) MTEST_INTERNAL_CHECK_NOT_VALUE(Value, Wanted, MTest::EFailType::Check)
-/// It must evaluate to true statement, if not test will fail but will continue execution.
+/// It must evaluate to true statement, if not test will fail and continue execution.
+#define MTEST_CHECK_POINTER(Value, Wanted) MTEST_INTERNAL_CHECK_POINTER(Value, Wanted, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail and continue execution.
+#define MTEST_CHECK_NOT_POINTER(Value, Wanted) MTEST_INTERNAL_CHECK_NOT_POINTER(Value, Wanted, MTest::EFailType::Check)
+/// It must evaluate to true statement, if not test will fail and continue execution.
 #define MTEST_CHECK_NULL(Value) MTEST_INTERNAL_CHECK_NULL(Value, MTest::EFailType::Check)
-/// It must evaluate to true statement, if not test will fail but will continue execution.
+/// It must evaluate to true statement, if not test will fail and continue execution.
 #define MTEST_CHECK_NOT_NULL(Value) MTEST_INTERNAL_CHECK_NOT_NULL(Value, MTest::EFailType::Check)
-/// Check if floating point is near given value
+/// Check if floating point is near given value, if not test will fail and continue execution.
 #define MTEST_CHECK_NEAR(Value, Wanted, Epsilon) MTEST_INTERNAL_CHECK_NEAR(Value, Wanted, Epsilon, MTest::EFailType::Check)
-/// Check if given exception is throw
+/// Check if given exception is throw, if not test will fail and continue execution.
 #define MTEST_CHECK_THROW(Statement, Exception) MTEST_INTERNAL_CHECK_THROW(Statement, Exception, MTest::EFailType::Check)
-/// Check if any exception is throw
+/// Check if any exception is throw, if not test will fail and continue execution.
 #define MTEST_CHECK_ANY_THROW(Statement) MTEST_INTERNAL_CHECK_ANY_THROW(Statement, MTest::EFailType::Check)
-/// Check if exception is not throw
+/// Check if exception is not throw, if not test will fail and continue execution.
 #define MTEST_CHECK_NO_THROW(Statement) MTEST_INTERNAL_CHECK_NO_THROW(Statement, MTest::EFailType::Check)
-/// User defined check
+/// User defined check, if not evaluated to true statement test will fail and continue execution.
 #define MTEST_CHECK_CUSTOM(Result) MTEST_INTERNAL_CHECK_CUSTOM(Result, MTest::EFailType::Check)
 
-/// Must evaluate to true statement, if not test will fail and will exit.
+/// Must evaluate to true statement, if not test will fail and abort execution.
 #define MTEST_ASSERT_TRUE(Condition) MTEST_INTERNAL_CHECK_TRUE(Condition, MTest::EFailType::Assert)
-/// Must evaluate to false statement, if not test will fail and will exit.
+/// Must evaluate to false statement, if not test will fail and abort execution.
 #define MTEST_ASSERT_FALSE(Condition) MTEST_INTERNAL_CHECK_FALSE(Condition, MTest::EFailType::Assert)
-/// Must evaluate to true statement, if not test will fail and will exit.
+/// Must evaluate to true statement, if not test will fail and abort execution.
 #define MTEST_ASSERT_VALUE(Value, Wanted) MTEST_INTERNAL_CHECK_VALUE(Value, Wanted, MTest::EFailType::Assert)
-/// Must evaluate to true statement, if not test will fail and will exit.
+/// Must evaluate to true statement, if not test will fail and abort execution.
 #define MTEST_ASSERT_NOT_VALUE(Value, Wanted) MTEST_INTERNAL_CHECK_NOT_VALUE(Value, Wanted, MTest::EFailType::Assert)
-/// Must evaluate to true statement, if not test will fail and will exit.
+/// Must evaluate to true statement, if not test will fail and abort execution.
+#define MTEST_ASSERT_POINTER(Value, Wanted) MTEST_INTERNAL_CHECK_POINTER(Value, Wanted, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and abort execution.
+#define MTEST_ASSERT_NOT_POINTER(Value, Wanted) MTEST_INTERNAL_CHECK_NOT_POINTER(Value, Wanted, MTest::EFailType::Assert)
+/// Must evaluate to true statement, if not test will fail and abort execution.
 #define MTEST_ASSERT_NULL(Value) MTEST_INTERNAL_CHECK_NULL(Value, MTest::EFailType::Assert)
-/// Must evaluate to true statement, if not test will fail and will exit.
+/// Must evaluate to true statement, if not test will fail and abort execution.
 #define MTEST_ASSERT_NOT_NULL(Value) MTEST_INTERNAL_CHECK_NOT_NULL(Value, MTest::EFailType::Assert)
-/// Check if floating point is near given value
+/// Check if floating point is near given value, if not test will fail and abort execution.
 #define MTEST_ASSERT_NEAR(Value, Wanted, Epsilon) MTEST_INTERNAL_CHECK_NEAR(Value, Wanted, Epsilon, MTest::EFailType::Assert)
-/// Check if given exception is throw
+/// Check if given exception is throw, if not test will fail and abort execution.
 #define MTEST_ASSERT_THROW(Statement, Exception) MTEST_INTERNAL_CHECK_THROW(Statement, Exception, MTest::EFailType::Assert)
-/// Check if any exception is throw
+/// Check if any exception is throw, if not test will fail and abort execution.
 #define MTEST_ASSERT_ANY_THROW(Statement) MTEST_INTERNAL_CHECK_ANY_THROW(Statement, MTest::EFailType::Assert)
-/// Check if exception is not throw
+/// Check if exception is not throw, if not test will fail and abort execution.
 #define MTEST_ASSERT_NO_THROW(Statement) MTEST_INTERNAL_CHECK_NO_THROW(Statement, MTest::EFailType::Assert)
-/// User defined assert
+/// User defined assert, if not evaluated to true statement test will fail and abort execution.
 #define MTEST_ASSERT_CUSTOM(Result) MTEST_INTERNAL_CHECK_CUSTOM(Result, MTest::EFailType::Assert)
 
 //// Logs & Utility
@@ -251,7 +261,14 @@ namespace MTest
     class ISink
     {
     public:
+        ISink() = default;
         virtual ~ISink() = default;
+
+        ISink(const ISink&) = delete;
+        ISink& operator=(const ISink&) = delete;
+
+        ISink(ISink&&) = delete;
+        ISink& operator=(ISink&&) = delete;
 
         virtual void SetColor(const EConsoleColor) = 0;
         virtual void Write(const std::string&) = 0;
@@ -392,6 +409,12 @@ namespace MTest
     public:
         ~CLog() = default;
 
+        CLog(const CLog&) = delete;
+        CLog& operator=(const CLog&) = delete;
+
+        CLog(CLog&&) = delete;
+        CLog& operator=(CLog&&) = delete;
+
         static CLog& Instance()
         {
             static CLog log;
@@ -449,6 +472,12 @@ namespace MTest
     {
         Fixture() = default;
         virtual ~Fixture() = default;
+
+        Fixture(const Fixture&) = delete;
+        Fixture& operator=(const Fixture&) = delete;
+
+        Fixture(Fixture&&) = delete;
+        Fixture& operator=(Fixture&&) = delete;
 
         /// Should return true if test case should be skipped.
         virtual bool Skip() { return false; }
@@ -518,6 +547,12 @@ namespace MTest
     {
         IFixtureWrapper() = default;
         virtual ~IFixtureWrapper() = default;
+
+        IFixtureWrapper(const IFixtureWrapper&) = delete;
+        IFixtureWrapper& operator=(const IFixtureWrapper&) = delete;
+
+        IFixtureWrapper(IFixtureWrapper&&) = delete;
+        IFixtureWrapper& operator=(IFixtureWrapper&&) = delete;
 
         virtual void MTest_Run() = 0;
         virtual bool MTest_Skip() = 0;
@@ -626,7 +661,7 @@ namespace MTest
     {
         return std::nullopt;
     }
-    // Call to fail check
+    /// Call to fail check
     template<class...Args>
     CheckResult CheckFailure(const std::format_string<Args...> fmt, Args&&...args)
     {
@@ -748,6 +783,30 @@ namespace MTest
                 return true;
             }
             HandleFailure(std::format("Value '{}' should not be '{}'", message, wanted), type, location);
+            return false;
+        }
+
+        template<class T>
+        bool CheckPointer(const T* value, const T* wanted, const std::string& message, const EFailType type,
+            const std::source_location location = std::source_location::current())
+        {
+            if( value == wanted )
+            {
+                return true;
+            }
+            HandleFailure(std::format("Pointer '{}' should be {}", message, static_cast<const void*>(wanted)), type, location);
+            return false;
+        }
+
+        template<class T>
+        bool CheckNotPointer(const T* value, const T* wanted, const std::string& message, const EFailType type,
+            const std::source_location location = std::source_location::current())
+        {
+            if( value != wanted )
+            {
+                return true;
+            }
+            HandleFailure(std::format("Pointer '{}' should not be {}", message, static_cast<const void*>(wanted)), type, location);
             return false;
         }
 
