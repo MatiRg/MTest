@@ -69,8 +69,8 @@ SOFTWARE.
 #define MTEST_INTERNAL_CHECK_NOT_VALUE(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckNotEqual( Value, Wanted, #Value, Type )
 #define MTEST_INTERNAL_CHECK_POINTER(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckPointer( Value, Wanted, #Value, Type )
 #define MTEST_INTERNAL_CHECK_NOT_POINTER(Value, Wanted, Type) MTest::GetTestManager().GetActiveTest()->CheckNotPointer( Value, Wanted, #Value, Type )
-#define MTEST_INTERNAL_CHECK_NULL(Value, Type) MTest::GetTestManager().GetActiveTest()->CheckNull( Value, #Value, Type )
-#define MTEST_INTERNAL_CHECK_NOT_NULL(Value, Type) MTest::GetTestManager().GetActiveTest()->CheckNotNull( Value, #Value, Type )
+#define MTEST_INTERNAL_CHECK_NULL(Value, Type) MTest::GetTestManager().GetActiveTest()->CheckPointer( Value, nullptr, #Value, Type )
+#define MTEST_INTERNAL_CHECK_NOT_NULL(Value, Type) MTest::GetTestManager().GetActiveTest()->CheckNotPointer( Value, nullptr, #Value, Type )
 #define MTEST_INTERNAL_CHECK_NEAR(Value, Wanted, Epsilon, Type) MTest::GetTestManager().GetActiveTest()->CheckNear( Value, Wanted, Epsilon, #Value, Type )
 #define MTEST_INTERNAL_CHECK_THROW(Statement, Exception, Type) MTest::GetTestManager().GetActiveTest()->CheckThrow< Exception >( [&](){ Statement; }, #Statement, #Exception, Type )
 #define MTEST_INTERNAL_CHECK_ANY_THROW(Statement, Type) MTest::GetTestManager().GetActiveTest()->CheckAnyThrow( [&](){ Statement; }, #Statement, Type )
@@ -828,28 +828,6 @@ namespace MTest
             return false;
         }
 
-        template<IsPointerType T>
-        bool CheckNull(const T& pointer, const std::string& message, const EFailType type, const std::source_location location = std::source_location::current())
-        {
-            if( pointer == nullptr )
-            {
-                return true;
-            }
-            HandleFailure(std::format("Pointer '{}' should be null", message), type, location);
-            return false;
-        }
-
-        template<IsPointerType T>
-        bool CheckNotNull(const T& pointer, const std::string& message, const EFailType type, const std::source_location location = std::source_location::current())
-        {
-            if( pointer != nullptr )
-            {
-                return true;
-            }
-            HandleFailure(std::format("Pointer '{}' should not be null", message), type, location);
-            return false;
-        }
-
         bool CheckTrue(const bool result, const std::string& message, const EFailType type, const std::source_location location = std::source_location::current())
         {
             if( result )
@@ -874,7 +852,7 @@ namespace MTest
         bool CheckNear(const T& value, const T& wanted, const T& epsilon, const std::string& message, const EFailType type,
             const std::source_location location = std::source_location::current())
         {
-            if( std::abs(value - wanted) < epsilon )
+            if( std::abs(value - wanted) <= epsilon )
             {
                 return true;
             }
