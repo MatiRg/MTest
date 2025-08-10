@@ -1,7 +1,7 @@
 # MTest 
 MTest is small, quick and dirty, header-only C++23 Unit Test library inspired by Catch2 nad gtest.
 ## Installing
-Copy MTest.hpp to your source dir.
+Copy MTest.hpp to your source dir.  
 After that include header and you are good to go.
 ## Documentation
 ### Test basic
@@ -23,9 +23,21 @@ MTEST_UNIT_TEST(SectionName, UniqueTestName)
     MTEST_ASSERT_TRUE(a > 0);
 }
 ```
-In final step in one source file you need to define `int main(int argc, char* argv[])`, use `MTEST_MAIN` macro.
+Final step is to define in one source file main function, you can use `MTEST_MAIN` macro.
 ```C++
 MTEST_MAIN
+```
+Or you can write it like this (without macro):
+```C++
+int main(int argc, char* argv[])
+{
+    // This will create console logger (with colors).
+    MTest::GetLog().CreateSink<MTest::CStdSink>();
+    // This will create file logger.
+    MTest::GetLog().CreateSink<MTest::CFileSink>("Output.txt");
+    // Run tests.
+	return MTest::GetTestManager().Run(argc, argv) ? 0 : 1;
+}
 ```
 Test can use various assertion divide into two groups:
 * Check group - these will fail test and continue execution of given test
@@ -39,6 +51,8 @@ Aviable assertions are showcased here:
 | MTEST_CHECK_FALSE | No | Must evalute to false |
 | MTEST_CHECK_VALUE | No | Check if both values are the same |
 | MTEST_CHECK_NOT_VALUE | No | Check if both values are different |
+| MTEST_CHECK_POINTER | No | Check if both pointers are the same |
+| MTEST_CHECK_NOT_POINTER | No | Check if both pointers are different |
 | MTEST_CHECK_NULL | No | Check if pointer is null |
 | MTEST_CHECK_NOT_NULL | No | Check if pointer is not null |
 | MTEST_CHECK_NEAR | No | Check if floating point is near given value |
@@ -50,6 +64,8 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_FALSE | Yes | Must evalute to false |
 | MTEST_ASSERT_VALUE | Yes | Check if both values are the same |
 | MTEST_ASSERT_NOT_VALUE | Yes | Check if both values are different |
+| MTEST_ASSERT_POINTER | Yes | Check if both pointers are the same |
+| MTEST_ASSERT_NOT_POINTER | Yes | Check if both pointers are different |
 | MTEST_ASSERT_NULL | Yes | Check if pointer is null |
 | MTEST_ASSERT_NOT_NULL | Yes | Check if pointer is not null |
 | MTEST_ASSERT_NEAR | Yes | Check if floating point is near given value |
@@ -57,6 +73,9 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_ANY_THROW | Yes | Check if any exception is throw |
 | MTEST_ASSERT_NO_THROW | Yes | Check if no exception is throw |
 | MTEST_ASSERT_CUSTOM | Yes | Check for user defined verification |
+
+When comparing pointers use MTEST_xxx_POINTER, MTEST_xxx_NOT_POINTER, MTEST_xxx_NULL and MTEST_xxx_NOT_NULL assertions (they do not compare value under pointer only address).  
+In case of MTEST_xxx_VALUE and MTEST_xxx_NOT_VALUE should only be used to compare non pointer types or values.
 
 ### Fixtures
 You can use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:

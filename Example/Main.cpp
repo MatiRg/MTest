@@ -39,12 +39,31 @@ MTEST_UNIT_TEST(Basic, Hello)
     // Check floating point is equal (near given value).
     float f = 3.0f;
     MTEST_CHECK_NEAR(f, 3.0f, MTest::EPSILON_SMALL<float>);
+    // Compare pointer values.
+    int* aa = &a;
+    int* bb = &b;
+    int* cc = nullptr;
+    MTEST_CHECK_NOT_NULL(aa);
+    MTEST_CHECK_NULL(cc);
+    // Pointers must be equal (it does not compare values).
+    MTEST_CHECK_POINTER(aa, &a);
+    // Pointers must not be equal (it does not compare values).
+    MTEST_CHECK_NOT_POINTER(aa, nullptr);
+    MTEST_CHECK_NOT_POINTER(aa, bb);
 }
 
 MTEST_UNIT_TEST(Basic, HelloFail)
 {
     int a = 7;
     int b = 3;
+    // Compare pointer values.
+    int* aa = &a;
+    int* bb = &b;
+    int* cc = nullptr;
+    MTEST_CHECK_NULL(aa);
+    MTEST_CHECK_NOT_NULL(cc);
+    MTEST_CHECK_POINTER(aa, bb);
+    MTEST_CHECK_POINTER(aa, nullptr);
     // Must not be equal, if not test will fail and will exit.
     MTEST_ASSERT_NOT_VALUE(a+b, 10);
 }
@@ -224,9 +243,11 @@ MTEST_MAIN
 /*
 int main(int argc, char* argv[])
 {
-    // Add output - console
-    MTEST_CREATE_STD_SINK;
-    // ... and some logic here
-	return MTEST_RUN_TESTS(argc, argv) ? 0 : 1; // Will run test application.
+    // This will create console logger (with colors).
+    MTest::GetLog().CreateSink<MTest::CStdSink>();
+    // This will create file logger.
+    MTest::GetLog().CreateSink<MTest::CFileSink>("Output.txt");
+    // Run tests.
+	return MTest::GetTestManager().Run(argc, argv) ? 0 : 1;
 }
 */
