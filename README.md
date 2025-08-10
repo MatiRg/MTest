@@ -74,6 +74,9 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_NO_THROW | Yes | Check if no exception is throw |
 | MTEST_ASSERT_CUSTOM | Yes | Check for user defined verification |
 
+When comparing pointers use MTEST_xxx_POINTER, MTEST_xxx_NOT_POINTER, MTEST_xxx_NULL and MTEST_xxx_NOT_NULL assertions (they do not compare value under pointer only address).  
+In case of MTEST_xxx_VALUE and MTEST_xxx_NOT_VALUE should only be used to compare non pointer types or values.
+
 ### Fixtures
 You can use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:
 

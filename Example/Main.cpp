@@ -243,9 +243,11 @@ MTEST_MAIN
 /*
 int main(int argc, char* argv[])
 {
-    // Add output - console
-    MTEST_CREATE_STD_SINK;
-    // ... and some logic here
-	return MTEST_RUN_TESTS(argc, argv) ? 0 : 1; // Will run test application.
+    // This will create console logger (with colors).
+    MTest::GetLog().CreateSink<MTest::CStdSink>();
+    // This will create file logger.
+    MTest::GetLog().CreateSink<MTest::CFileSink>("Output.txt");
+    // Run tests.
+	return MTest::GetTestManager().Run(argc, argv) ? 0 : 1;
 }
 */

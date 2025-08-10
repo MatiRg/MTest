@@ -643,7 +643,7 @@ namespace MTest
         {
             if constexpr(std::is_null_pointer_v<T>)
             {
-                // It maybe special std::nullptr_t type in this case just return null.
+                // Special std::nullptr_t type in this case just return null.
                 return "null";
             }
             else
