@@ -478,6 +478,12 @@ namespace MTest
         Fixture& operator=(const Fixture&) = delete;
         Fixture& operator=(Fixture&&) = delete;
 
+        Fixture(const Fixture&) = delete;
+        Fixture& operator=(const Fixture&) = delete;
+
+        Fixture(Fixture&&) = delete;
+        Fixture& operator=(Fixture&&) = delete;
+
         /// Should return true if test case should be skipped.
         virtual bool Skip() { return false; }
         /// Use Assertions to check state.
@@ -550,6 +556,12 @@ namespace MTest
         virtual ~IFixtureWrapper() = default;
         
         IFixtureWrapper& operator=(const IFixtureWrapper&) = delete;
+        IFixtureWrapper& operator=(IFixtureWrapper&&) = delete;
+
+        IFixtureWrapper(const IFixtureWrapper&) = delete;
+        IFixtureWrapper& operator=(const IFixtureWrapper&) = delete;
+
+        IFixtureWrapper(IFixtureWrapper&&) = delete;
         IFixtureWrapper& operator=(IFixtureWrapper&&) = delete;
 
         virtual void MTest_Run() = 0;
