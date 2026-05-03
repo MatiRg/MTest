@@ -1,8 +1,10 @@
 # MTest 
 MTest is small, quick and dirty, header-only C++23 Unit Test library inspired by Catch2 nad gtest.
+
 ## Installing
 Copy MTest.hpp to your source dir.  
 After that include header and you are good to go.
+
 ## Documentation
 ### Test basic
 First you need to start with including header.
@@ -109,9 +111,21 @@ MTEST_UNIT_TEST(DynamicEngine, CanCalculate)
 MTEST_UNIT_TEST_FIXTURE(DynamicEngine, CanCalculate, DynamicEngineFixture)
 {}
 ```
-### Manually fail test
+
+### Simple unit test
+You can also define test cases without explicit need to define fixture, instead default one will be used:
+```C++
+MTEST_SIMPLE_UNIT_TEST(SectionName, UniqueTestName)
+{
+    int a = CalculateSomething(4);
+    MTEST_CHECK_VALUE(a, 8);
+}
+```
+
+### Manual fail test
 You can fail test in a explicit way by using:
 `MTEST_FAIL(Reason, StopExecution)` in test body.
+
 ### Test skipping
 You can skip test by overriding Fixture method `bool Skip()` and also by using 
 `MTEST_SKIP(Why)` in test body.
@@ -121,6 +135,7 @@ MTEST_UNIT_TEST(Fundamentals, SetupEngine)
     MTEST_SKIP("Not Supported on this Platform");
 }
 ```
+
 ### Trace messages
 You can also output trace messages to output with `MTEST_INFO`.
 ```C++
@@ -129,6 +144,7 @@ MTEST_UNIT_TEST(Example, Basic)
     MTEST_INFO("Going with code path normal");
 }
 ```
+
 ### Table tests
 Table tests are test that reuse test body for several test items. First you need to define test data type - do not use heap types or types that require manual setup.
 ```C++
@@ -177,6 +193,7 @@ MTEST_TABLE_UNIT_TEST(MathTest, EnigmaticFunction, MathTestDataArray)
     CheckWork(testData.Arg1, testData.Arg2, testData.Result);
 }
 ```
+
 ### Support for user specified types in MTEST_XXX_NEAR check
 To support user specified types in `MTEST_CHECK_NEAR` and `MTEST_ASSERT_NEAR` you must specialize `MTest::Approx` struct:
 ```C++
@@ -189,6 +206,7 @@ struct MTest::Approx<MyVector2>
     }
 };
 ```
+
 ### User defined check
 User can define their own check/assert macro to accommodate custom type. First step is to define check function:
 ```C++
@@ -217,13 +235,18 @@ MTEST_UNIT_TEST(User, Sample)
     MY_ASSERT(a, 7);
 }
 ```
+
 ### Configuration options
 You can define `MTEST_CONFIG_NO_COLOR` before including header file to disable console colors and ommit dependency for `windows.h`.
+
 ### Command line options
 Test can be skipped (filtered out) by command line: `./Tests.exe -F=Selected` only test that full name contains `Selected` will be run.
+
 ## Example output
 ![alt text](Output.png "Example (Console) output.") 
+
 ## Example
 See [Main.cpp](Example/Main.cpp)
+
 ## License
 See [LICENSE.txt](LICENSE.txt)
