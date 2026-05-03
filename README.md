@@ -109,7 +109,7 @@ MTEST_UNIT_TEST(DynamicEngine, CanCalculate)
 MTEST_UNIT_TEST_FIXTURE(DynamicEngine, CanCalculate, DynamicEngineFixture)
 {}
 ```
-### Manually fail test
+### Manual fail test
 You can fail test in a explicit way by using:
 `MTEST_FAIL(Reason, StopExecution)` in test body.
 ### Test skipping
