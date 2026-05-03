@@ -283,8 +283,8 @@ namespace MTest
     {
     public:
     #if !defined(MTEST_CONFIG_NO_COLOR) && defined(MTEST_WINDOWS_PLATFORM)
-        CConsoleSink() { Initialize_Windows(); }
-        ~CConsoleSink() { Cleanup_Windows(); }
+        CConsoleSink() { InitializeWindowsOS(); }
+        ~CConsoleSink() { CleanupWindowsOS(); }
     #else
         CConsoleSink() = default;
         ~CConsoleSink() = default;
@@ -297,24 +297,24 @@ namespace MTest
             switch(value)
             {
             case EConsoleColor::Red:
-                SetColor_Windows(12);
+                SetColorWindowsOS(12);
                 break;
             case EConsoleColor::Yellow:
-                SetColor_Windows(14);
+                SetColorWindowsOS(14);
                 break;
             case EConsoleColor::Green:
-                SetColor_Windows(10);
+                SetColorWindowsOS(10);
                 break;
             case EConsoleColor::Blue:
-                SetColor_Windows(9);
+                SetColorWindowsOS(9);
                 break;
             case EConsoleColor::Magenta:
-                SetColor_Windows(13);
+                SetColorWindowsOS(13);
                 break;
             case EConsoleColor::Default:
                 [[fallthrough]];
             default:
-                SetColor_Windows(7);
+                SetColorWindowsOS(7);
                 break;
             }
         #else
@@ -351,18 +351,18 @@ namespace MTest
     
     #if !defined(MTEST_CONFIG_NO_COLOR) && defined(MTEST_WINDOWS_PLATFORM)
     private:
-        void Initialize_Windows()
+        void InitializeWindowsOS()
         {
             Handle = GetStdHandle(STD_OUTPUT_HANDLE);
             CONSOLE_SCREEN_BUFFER_INFO consoleInfo{};
             std::ignore = GetConsoleScreenBufferInfo(Handle, &consoleInfo);
             ConsoleAttributes = consoleInfo.wAttributes;
         }
-        void Cleanup_Windows()
+        void CleanupWindowsOS()
         {
             std::ignore = SetConsoleTextAttribute(Handle, ConsoleAttributes);
         }
-        void SetColor_Windows(WORD color)
+        void SetColorWindowsOS(WORD color)
         {
             constexpr WORD COLOR_MASK = 0x000F;
             // Integer promotion when use smaller types.
@@ -494,16 +494,10 @@ namespace MTest
     template<class T>
     using TableDataArray = std::vector<T>;
 
-    // Type traits
-    namespace Details
-    {
-        template<class T>
-        struct IsTableDataArrayTrait: std::false_type {};
-        template<class T>
-        struct IsTableDataArrayTrait<TableDataArray<T>>: std::true_type {};
-    }
     template<class T>
-    concept IsTableDataArray = Details::IsTableDataArrayTrait<T>::value;
+    concept IsTableDataArray = 
+        requires { typename T::value_type; } &&
+        std::same_as<T, std::vector<typename T::value_type>>;
 
     /// Fixture to use with Table tests.
     template<class Type, std::derived_from<Fixture> Base>
@@ -531,20 +525,14 @@ namespace MTest
         using BaseClass::Cleanup;
     };
 
-    // Type traits
-    // https://en.cppreference.com/w/cpp/types/is_base_of
-    // https://stackoverflow.com/questions/36632897/type-trait-to-check-whether-some-type-is-derived-from-a-class-template?rq=3
-    namespace Details
-    {
-        template<class T, class U>
-        constexpr std::true_type IsTableFixtureHelper(const TableFixture<T, U>*) { return {}; }
-        constexpr std::false_type IsTableFixtureHelper(const void*) { return {}; }
-        //
-        template<class Derived>
-        struct IsTableFixtureTrait: std::bool_constant<decltype(IsTableFixtureHelper(std::declval<typename std::remove_cv<Derived*>::type>()))::value> {};
-    }
     template<class T>
-    concept IsTableFixture = Details::IsTableFixtureTrait<T>::value;
+    concept IsTableFixture =
+        requires
+        {
+            typename T::DataType;
+            typename T::BaseClass;
+        } &&
+        std::derived_from<T, TableFixture<typename T::DataType, typename T::BaseClass>>;
 
     struct IFixtureWrapper
     {
