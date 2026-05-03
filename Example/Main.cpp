@@ -23,6 +23,12 @@ SOFTWARE.
 */
 #include "../Include/MTest.hpp"
 
+// You must define fixture (Fixture name is inferred from section name eg. 'SectionName' + Fixture in test declaration).
+struct BasicFixture: public MTest::Fixture
+{
+    // Helper, common data etc.
+};
+
 // Define test case, give section name and test case name. Tests are executed by section, test case name
 // must be unique in given section.
 MTEST_UNIT_TEST(Basic, Hello)
@@ -68,6 +74,10 @@ MTEST_UNIT_TEST(Basic, HelloFail)
     MTEST_ASSERT_NOT_VALUE(a+b, 10);
 }
 
+struct OtherFixture: public MTest::Fixture
+{
+};
+
 MTEST_UNIT_TEST(Other, MathFail)
 {
     int a = 7;
@@ -103,7 +113,7 @@ protected:
 
 // Create test case with user fixture.
 // Fixture name is created as follows: MathOperations + 'Fixture'
-MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
+MTEST_UNIT_TEST(MathOperations, CheckSomething)
 {
     MTEST_ASSERT_TRUE(MyField == 6);
     int* Tmp = nullptr;
@@ -112,7 +122,7 @@ MTEST_UNIT_TEST_F(MathOperations, CheckSomething)
 }
 
 // Similar as above
-MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, MathOperationsFixture)
+MTEST_UNIT_TEST_FIXTURE(MathOperations, CheckSomething2, MathOperationsFixture)
 {
     int b = 3;
     MTEST_ASSERT_VALUE(MyField, 6);
@@ -120,6 +130,10 @@ MTEST_UNIT_TEST_FX(MathOperations, CheckSomething2, MathOperationsFixture)
     MTEST_ASSERT_NOT_NULL(Tmp);
     MTEST_ASSERT_TRUE(MyField != *Tmp);
 }
+
+struct SimpleSkipFixture: public MTest::Fixture
+{
+};
 
 // Test case skip example
 MTEST_UNIT_TEST(SimpleSkip, ShowSkip1)
@@ -140,11 +154,15 @@ struct AdvancedSkipFixture: public MTest::Fixture
 };
 
 // Test case skip with Fixture example
-MTEST_UNIT_TEST_F(AdvancedSkip, ShowSkip2)
+MTEST_UNIT_TEST(AdvancedSkip, ShowSkip2)
 {
     int b = 3;
     MTEST_ASSERT_FALSE(b == 3);
 }
+
+struct ExceptionsFixture: public MTest::Fixture
+{
+};
 
 // Test case with uncaught exception
 MTEST_UNIT_TEST(Exceptions, Uncaught)
@@ -206,7 +224,7 @@ MTest::TableDataArray<MathTestData> MathTestDataArray =
     {"AddPositives2", 3, 7, 10}
 };
 // Define Test Case
-MTEST_UNIT_TEST_F_T(MathTest, EnigmaticFunction, MathTestDataArray)
+MTEST_TABLE_UNIT_TEST(MathTest, EnigmaticFunction, MathTestDataArray)
 {
     // Access test data with: testData
     CheckWork(testData.Arg1, testData.Arg2, testData.Result);
@@ -228,12 +246,63 @@ MTest::CheckResult MyCheck(const T& value, const T& wanted)
 #define MY_CHECK(Value, Wanted) MTEST_CHECK_CUSTOM(MyCheck(Value, Wanted))
 #define MY_ASSERT(Value, Wanted) MTEST_ASSERT_CUSTOM(MyCheck(Value, Wanted))
 
+struct UserFixture: public MTest::Fixture
+{
+};
+
 // Define test for user check
 MTEST_UNIT_TEST(User, Sample)
 {
     int a = 7;
     MY_CHECK(a, 7);
     MY_ASSERT(a, 7);
+}
+
+struct MyVector2
+{
+    float x{};
+    float y{};
+
+    MyVector2 operator-(const MyVector2& other) const
+    {
+        return {x - other.x, y - other.y};
+    }
+
+    float Length() const
+    {
+        return std::sqrt(x*x + y*y);
+    }
+
+    float Distance(const MyVector2& other) const
+    {
+        return (*this - other).Length();
+    }
+};
+
+template<>
+struct std::formatter<MyVector2>: std::formatter<std::string_view>
+{
+    auto format(const MyVector2& value, std::format_context& ctx) const
+    {
+        return std::formatter<std::string_view>::format(std::format("{} {}", value.x, value.y), ctx);
+    }
+};
+
+template<>
+struct MTest::Approx<MyVector2>
+{
+    static bool IsNear(const MyVector2& value, const MyVector2& wanted, float epsilon)
+    {
+        return value.Distance(wanted) <= epsilon;
+    }
+};
+
+MTEST_UNIT_TEST(User, SampleNear)
+{
+    // Pass
+    MTEST_CHECK_NEAR(MyVector2(1.0f, 2.0f), MyVector2(1.0f, 2.0f), MTest::EPSILON_SMALL<float>);
+    // Fail
+    MTEST_CHECK_NEAR(MyVector2(1.0f, 2.0f), MyVector2(5.0f, 5.0f), MTest::EPSILON_SMALL<float>);
 }
 
 // Implements main() function
@@ -244,7 +313,7 @@ MTEST_MAIN
 int main(int argc, char* argv[])
 {
     // This will create console logger (with colors).
-    MTest::GetLog().CreateSink<MTest::CStdSink>();
+    MTest::GetLog().CreateSink<MTest::CConsoleSink>();
     // This will create file logger.
     MTest::GetLog().CreateSink<MTest::CFileSink>("Output.txt");
     // Run tests.
