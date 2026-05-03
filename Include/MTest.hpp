@@ -133,6 +133,9 @@ SOFTWARE.
 
 //// Logs & Utility
 
+/// Fail test
+#define MTEST_FAIL(Reason, Stop) MTest::GetTestManager().GetActiveTest()->Fail( Reason, Stop )
+
 /// Skip test
 #define MTEST_SKIP(Reason) MTest::GetTestManager().GetActiveTest()->Skip( Reason )
 
@@ -141,7 +144,7 @@ SOFTWARE.
 
 //// Test Setup
 
-#define MTEST_INTERNAL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, ConcreteFixture) \
+#define MTEST_INTERNAL_TABLE_UNIT_TEST(Section, Name, DataArray, ParentFixture, ConcreteFixture) \
 struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
 { \
     static_assert(MTest::IsTableDataArray<decltype(DataArray)>, "Data Array must be of type TableDataArray"); \
@@ -180,16 +183,16 @@ namespace \
 } \
 void ConcreteFixture::MTest_Run([[maybe_unused]] const ConcreteFixture::DataType& testData)
 
-/// Define test case, give section name, test case name, data array and fixture name. Tests are executed by section, test case name
-/// must be unique in given section.
-#define MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture) \
-    MTEST_INTERNAL_UNIT_TEST_FX_T(Section, Name, DataArray, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
+/// Define test case: give section name, test case name, data array and fixture name.
+/// Test case name must be unique in given section.
+#define MTEST_TABLE_UNIT_TEST_FIXTURE(Section, Name, DataArray, ParentFixture) \
+    MTEST_INTERNAL_TABLE_UNIT_TEST(Section, Name, DataArray, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-/// Define test case, give section name, test case name and data array. Fixture name is inferred from section name eg. 'Section' + TableFixture
-/// Tests are executed by section, test case name must be unique in given section.
-#define MTEST_UNIT_TEST_F_T(Section, Name, DataArray) MTEST_UNIT_TEST_FX_T(Section, Name, DataArray, Section##TableFixture )
+/// Define test case: give section name, test case name and data array. Fixture name is inferred from section name eg. 'Section' + TableFixture.
+/// Test case name must be unique in given section.
+#define MTEST_TABLE_UNIT_TEST(Section, Name, DataArray) MTEST_TABLE_UNIT_TEST_FIXTURE(Section, Name, DataArray, Section##TableFixture )
 
-#define MTEST_INTERNAL_UNIT_TEST_FX(Section, Name, ParentFixture, ConcreteFixture) \
+#define MTEST_INTERNAL_UNIT_TEST(Section, Name, ParentFixture, ConcreteFixture) \
 struct ConcreteFixture final : ParentFixture, MTest::IFixtureWrapper \
 { \
     static_assert(std::derived_from<ParentFixture, MTest::Fixture>, "Must be base of Fixture"); \
@@ -213,21 +216,17 @@ namespace \
 } \
 void ConcreteFixture::MTest_Run()
 
-/// Define test case, give section name, test case name and fixture name. Tests are executed by section, test case name
-/// must be unique in given section.
-#define MTEST_UNIT_TEST_FX(Section, Name, ParentFixture) MTEST_INTERNAL_UNIT_TEST_FX(Section, Name, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
+/// Define test case: give section name, test case name and fixture name.
+/// Test case name must be unique in given section.
+#define MTEST_UNIT_TEST_FIXTURE(Section, Name, ParentFixture) MTEST_INTERNAL_UNIT_TEST(Section, Name, ParentFixture, MTEST_MACRO_CONCAT(MTest_##ParentFixture, __COUNTER__))
 
-/// Define test case, give section name, test case name. Fixture name is inferred from section name eg. 'Section' + Fixture
-/// Tests are executed by section, test case name must be unique in given section.
-#define MTEST_UNIT_TEST_F(Section, Name) MTEST_UNIT_TEST_FX(Section, Name, Section##Fixture )
+/// Define test case: give section name and test case name. Fixture name is inferred from section name eg. 'Section' + Fixture.
+/// Test case name must be unique in given section.
+#define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_FIXTURE(Section, Name, Section##Fixture )
 
-/// Define test case, give section name and test case name. Tests are executed by section, test case name
-/// must be unique in given section.
-#define MTEST_UNIT_TEST(Section, Name) MTEST_INTERNAL_UNIT_TEST_FX(Section, Name, MTest::Fixture, MTEST_MACRO_CONCAT(MTest_Fixture, __COUNTER__))
-
-/// Add STD sink.
-#define MTEST_CREATE_STD_SINK MTest::GetLog().CreateSink<MTest::CStdSink>()
-/// Add File sink.
+/// Add console sink.
+#define MTEST_CREATE_CONSOLE_SINK MTest::GetLog().CreateSink<MTest::CConsoleSink>()
+/// Add file sink.
 #define MTEST_CREATE_FILE_SINK(File) MTest::GetLog().CreateSink<MTest::CFileSink>( File )
 /// Use to launch unit test application.
 #define MTEST_RUN_TESTS(...) MTest::GetTestManager().Run( __VA_ARGS__ )
@@ -236,7 +235,7 @@ void ConcreteFixture::MTest_Run()
 #define MTEST_MAIN \
 int main(int argc, char* argv[]) \
 { \
-    MTEST_CREATE_STD_SINK; \
+    MTEST_CREATE_CONSOLE_SINK; \
 	return MTEST_RUN_TESTS(argc, argv) ? 0 : 1; \
 }
 
@@ -265,27 +264,26 @@ namespace MTest
     {
     public:
         ISink() = default;
+        ISink(const ISink&) = delete;
+        ISink(ISink&&) = delete;
         virtual ~ISink() = default;
 
-        ISink(const ISink&) = delete;
         ISink& operator=(const ISink&) = delete;
-
-        ISink(ISink&&) = delete;
         ISink& operator=(ISink&&) = delete;
 
         virtual void SetColor(const EConsoleColor) = 0;
         virtual void Write(const std::string&) = 0;
     };
 
-    class CStdSink final: public ISink
+    class CConsoleSink final: public ISink
     {
     public:
     #if !defined(MTEST_CONFIG_NO_COLOR) && defined(MTEST_WINDOWS_PLATFORM)
-        CStdSink() { Initialize_Windows(); }
-        ~CStdSink() { Cleanup_Windows(); }
+        CConsoleSink() { Initialize_Windows(); }
+        ~CConsoleSink() { Cleanup_Windows(); }
     #else
-        CStdSink() = default;
-        ~CStdSink() = default;
+        CConsoleSink() = default;
+        ~CConsoleSink() = default;
     #endif
 
     #ifndef MTEST_CONFIG_NO_COLOR
@@ -378,7 +376,7 @@ namespace MTest
     class CFileSink final: public ISink
     {
     public:
-        explicit CFileSink(const std::string& path):
+        CFileSink(const std::string& path):
             Handle(std::fopen(path.c_str(), "w"))
         {
         }
@@ -410,12 +408,11 @@ namespace MTest
     private:
         CLog() = default;
     public:
+        CLog(const CLog&) = delete;
+        CLog(CLog&&) = delete;
         ~CLog() = default;
 
-        CLog(const CLog&) = delete;
         CLog& operator=(const CLog&) = delete;
-
-        CLog(CLog&&) = delete;
         CLog& operator=(CLog&&) = delete;
 
         static CLog& Instance()
@@ -474,7 +471,12 @@ namespace MTest
     struct Fixture
     {
         Fixture() = default;
+        Fixture(const Fixture&) = delete;
+        Fixture(Fixture&&) = delete;
         virtual ~Fixture() = default;
+        
+        Fixture& operator=(const Fixture&) = delete;
+        Fixture& operator=(Fixture&&) = delete;
 
         Fixture(const Fixture&) = delete;
         Fixture& operator=(const Fixture&) = delete;
@@ -549,7 +551,12 @@ namespace MTest
     struct IFixtureWrapper
     {
         IFixtureWrapper() = default;
+        IFixtureWrapper(const IFixtureWrapper&) = delete;
+        IFixtureWrapper(IFixtureWrapper&&) = delete;
         virtual ~IFixtureWrapper() = default;
+        
+        IFixtureWrapper& operator=(const IFixtureWrapper&) = delete;
+        IFixtureWrapper& operator=(IFixtureWrapper&&) = delete;
 
         IFixtureWrapper(const IFixtureWrapper&) = delete;
         IFixtureWrapper& operator=(const IFixtureWrapper&) = delete;
@@ -654,23 +661,54 @@ namespace MTest
         }
     }
 
-    class CTestAssertionException final: public std::logic_error
+    class CTestAssertionException final: public std::runtime_error
     {
     public:
         CTestAssertionException():
-            std::logic_error("Test Assertion")
+            std::runtime_error("Test Assertion")
         {
         }
     };
 
-    class CTestSkippedException final: public std::logic_error
+    class CTestSkippedException final: public std::runtime_error
     {
     public:
         CTestSkippedException():
-            std::logic_error("Test Skipped")
+            std::runtime_error("Test Skipped")
         {
         }
     };
+
+    /// Helper used to define custom near comparision
+    template<class T>
+    struct Approx;
+
+    template<class T, class E>
+    concept HasApproxDefined = requires(const T& value, const T& wanted, const E& epsilon)
+    {
+        {Approx<T>::IsNear(value, wanted, epsilon)} -> std::convertible_to<bool>;
+    };
+
+    template<class T, class E>
+    bool IsNear(const T& value, const T& wanted, const E& epsilon)
+    {
+        if constexpr( HasApproxDefined<T, E> )
+        {
+            return Approx<T>::IsNear(value, wanted, epsilon);
+        }
+        else
+        {
+            return std::abs(value - wanted) <= epsilon;
+        }
+    }
+
+    /// Default epsilon
+    template<std::floating_point T>
+    inline constexpr T EPSILON = std::numeric_limits<T>::epsilon();
+
+    /// Small epsilon
+    template<std::floating_point T>
+    inline constexpr T EPSILON_SMALL = T{0.0001};
 
     /// User defined check result
     using CheckResult = std::optional<std::string>;
@@ -702,12 +740,11 @@ namespace MTest
             Fixture(std::move(fixture))
         {
         }
-        ~CTestCase() = default;
-
         CTestCase(const CTestCase&) = delete;
-        CTestCase& operator=(const CTestCase&) = delete;
-
         CTestCase(CTestCase&&) = delete;
+        ~CTestCase() = default;
+        
+        CTestCase& operator=(const CTestCase&) = delete;
         CTestCase& operator=(CTestCase&&) = delete;
 
         const std::string& GetSection() const { return Section; }
@@ -848,11 +885,11 @@ namespace MTest
             return false;
         }
 
-        template<std::floating_point T>
-        bool CheckNear(const T& value, const T& wanted, const T& epsilon, const std::string& message, const EFailType type,
+        template<class T, class E>
+        bool CheckNear(const T& value, const T& wanted, const E& epsilon, const std::string& message, const EFailType type,
             const std::source_location location = std::source_location::current())
         {
-            if( std::abs(value - wanted) <= epsilon )
+            if( IsNear(value, wanted, epsilon) )
             {
                 return true;
             }
@@ -921,6 +958,11 @@ namespace MTest
             }
             HandleFailure(result.value(), type, location);
             return false;
+        }
+
+        void Fail(const std::string& reason, bool stop, const std::source_location location = std::source_location::current())
+        {
+            HandleFailure(reason, stop ? EFailType::Assert : EFailType::Check, location);
         }
 
         void Skip(const std::string& reason)
@@ -999,12 +1041,11 @@ namespace MTest
     private:
         CTestManager() = default;
     public:
+        CTestManager(const CTestManager&) = delete;
+        CTestManager(CTestManager&&) = delete;
         ~CTestManager() = default;
 
-        CTestManager(const CTestManager&) = delete;
         CTestManager& operator=(const CTestManager&) = delete;
-
-        CTestManager(CTestManager&&) = delete;
         CTestManager& operator=(CTestManager&&) = delete;
 
         static CTestManager& Instance()
@@ -1163,15 +1204,9 @@ namespace MTest
     struct Registrar final
     {
         template<IsInvocable<void> Invocable>
-        explicit Registrar(Invocable invocable)
+        Registrar(Invocable invocable)
         {
             invocable();
         }
     };
-
-    template<std::floating_point T>
-    inline constexpr T EPSILON = std::numeric_limits<T>::epsilon();
-
-    template<std::floating_point T>
-    inline constexpr T EPSILON_SMALL = T{0.0001};
 }

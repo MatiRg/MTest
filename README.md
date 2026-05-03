@@ -9,6 +9,13 @@ First you need to start with including header.
 ```C++
 #include "MTest.hpp"
 ```
+Then you must define fixture (Fixture name is inferred from section name eg. 'SectionName' + Fixture in test declaration).
+```C++
+struct SectionNameFixture: public MTest::Fixture
+{
+    // Helper, common data etc.
+};
+```
 Next step is to define test case. You need to specify Section which is used to group individual tests and unique name - per section.
 ```C++
 MTEST_UNIT_TEST(SectionName, UniqueTestName)
@@ -32,7 +39,7 @@ Or you can write it like this (without macro):
 int main(int argc, char* argv[])
 {
     // This will create console logger (with colors).
-    MTest::GetLog().CreateSink<MTest::CStdSink>();
+    MTest::GetLog().CreateSink<MTest::CConsoleSink>();
     // This will create file logger.
     MTest::GetLog().CreateSink<MTest::CFileSink>("Output.txt");
     // Run tests.
@@ -55,7 +62,7 @@ Aviable assertions are showcased here:
 | MTEST_CHECK_NOT_POINTER | No | Check if both pointers are different |
 | MTEST_CHECK_NULL | No | Check if pointer is null |
 | MTEST_CHECK_NOT_NULL | No | Check if pointer is not null |
-| MTEST_CHECK_NEAR | No | Check if floating point is near given value |
+| MTEST_CHECK_NEAR | No | Check if floating point or user specified type is near given value |
 | MTEST_CHECK_THROW | No | Check if exception of given type is throw |
 | MTEST_CHECK_ANY_THROW | No | Check if any exception is throw |
 | MTEST_CHECK_NO_THROW | No | Check if no exception is throw |
@@ -68,7 +75,7 @@ Aviable assertions are showcased here:
 | MTEST_ASSERT_NOT_POINTER | Yes | Check if both pointers are different |
 | MTEST_ASSERT_NULL | Yes | Check if pointer is null |
 | MTEST_ASSERT_NOT_NULL | Yes | Check if pointer is not null |
-| MTEST_ASSERT_NEAR | Yes | Check if floating point is near given value |
+| MTEST_ASSERT_NEAR | Yes | Check if floating point or user specified type is near given value |
 | MTEST_ASSERT_THROW | Yes | Check if exception of given type is throw |
 | MTEST_ASSERT_ANY_THROW | Yes | Check if any exception is throw |
 | MTEST_ASSERT_NO_THROW | Yes | Check if no exception is throw |
@@ -78,30 +85,33 @@ When comparing pointers use MTEST_xxx_POINTER, MTEST_xxx_NOT_POINTER, MTEST_xxx_
 In case of MTEST_xxx_VALUE and MTEST_xxx_NOT_VALUE should only be used to compare non pointer types or values.
 
 ### Fixtures
-You can use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:
+Use fixture to create fixed environment in which tests are run and also share common helper methods or data. To create fixture you need inherit from `MTest::Fixture`. You can overwrite these methods:
 
 * `bool Skip()` - Use that nethod to skip tests, return `true` if it must be skipped
 * `void Setup()` - Use that method to setup test environment. Use Assertions to check state.
 * `void Cleanup()` - Use to clear data that must be freed in manual way
 
-To define test with Fixture you can use two macros:
+To define test you can use two macros:
 
-* `MTEST_UNIT_TEST_F(SectionName, UniqueTestName)` - Create test case with fixture that its name is inferred from section name eg. `SectionName + Fixture`.
-* `MTEST_UNIT_TEST_FX(SectionName, UniqueTestName, FixtureName)` - Create test case with fixture that is specified by FixtureName.
+* `MTEST_UNIT_TEST(SectionName, UniqueTestName)` - Create test case with fixture that its name is inferred from section name eg. `SectionName + Fixture`.
+* `MTEST_UNIT_TEST_FIXTURE(SectionName, UniqueTestName, FixtureName)` - Create test case with fixture that is specified by FixtureName.
 
-Example - both declaration define same test case, only their declaration method differs:
+Example - both define same test case, only their declaration method differs:
 ```C++
 struct DynamicEngineFixture: public MTest::Fixture
 {
     bool Skip() override { return true; }
 };
 
-MTEST_UNIT_TEST_F(DynamicEngine, CanCalculate) 
+MTEST_UNIT_TEST(DynamicEngine, CanCalculate) 
 {}
 
-MTEST_UNIT_TEST_FX(DynamicEngine, CanCalculate, DynamicEngineFixture)
+MTEST_UNIT_TEST_FIXTURE(DynamicEngine, CanCalculate, DynamicEngineFixture)
 {}
 ```
+### Manually fail test
+You can fail test in a explicit way by using:
+`MTEST_FAIL(Reason, StopExecution)` in test body.
 ### Test skipping
 You can skip test by overriding Fixture method `bool Skip()` and also by using 
 `MTEST_SKIP(Why)` in test body.
@@ -158,14 +168,26 @@ MTest::TableDataArray<MathTestData> MathTestDataArray =
 ```
 Final step is declare test case, you can use two macros:
 
-* `MTEST_UNIT_TEST_F_T(SectionName, UniqueTestName, DataArray)` - Create test case with fixture that its name is inferred from section name eg. `SectionName + TableFixture`.
-* `MTEST_UNIT_TEST_FX_T(SectionName, UniqueTestName, DataArray, FixtureName)` - Create test case with fixture that is specified by FixtureName.
+* `MTEST_TABLE_UNIT_TEST(SectionName, UniqueTestName, DataArray)` - Create test case with fixture that its name is inferred from section name eg. `SectionName + TableFixture`.
+* `MTEST_TABLE_UNIT_TEST_FIXTURE(SectionName, UniqueTestName, DataArray, FixtureName)` - Create test case with fixture that is specified by FixtureName.
 
 ```C++
-MTEST_UNIT_TEST_F_T(MathTest, EnigmaticFunction, MathTestDataArray)
+MTEST_TABLE_UNIT_TEST(MathTest, EnigmaticFunction, MathTestDataArray)
 {
     CheckWork(testData.Arg1, testData.Arg2, testData.Result);
 }
+```
+### Support for user specified types in MTEST_XXX_NEAR check
+To support user specified types in `MTEST_CHECK_NEAR` and `MTEST_ASSERT_NEAR` you must specialize `MTest::Approx` struct:
+```C++
+template<>
+struct MTest::Approx<MyVector2>
+{
+    static bool IsNear(const MyVector2& value, const MyVector2& wanted, float epsilon)
+    {
+        return Distance(value, wanted) <= epsilon;
+    }
+};
 ```
 ### User defined check
 User can define their own check/assert macro to accommodate custom type. First step is to define check function:
@@ -195,6 +217,8 @@ MTEST_UNIT_TEST(User, Sample)
     MY_ASSERT(a, 7);
 }
 ```
+### Configuration options
+You can define `MTEST_CONFIG_NO_COLOR` before including header file to disable console colors and ommit dependency for `windows.h`.
 ### Command line options
 Test can be skipped (filtered out) by command line: `./Tests.exe -F=Selected` only test that full name contains `Selected` will be run.
 ## Example output
