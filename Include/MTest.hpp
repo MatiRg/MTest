@@ -224,6 +224,10 @@ void ConcreteFixture::MTest_Run()
 /// Test case name must be unique in given section.
 #define MTEST_UNIT_TEST(Section, Name) MTEST_UNIT_TEST_FIXTURE(Section, Name, Section##Fixture )
 
+/// Define test case: give section name and test case name. It does not require fixture - it will use default fixture.
+/// Test case name must be unique in given section.
+#define MTEST_SIMPLE_UNIT_TEST(Section, Name) MTEST_INTERNAL_UNIT_TEST(Section, Name, MTest::Fixture, MTEST_MACRO_CONCAT(MTest_Fixture, __COUNTER__))
+
 /// Add console sink.
 #define MTEST_CREATE_CONSOLE_SINK MTest::GetLog().CreateSink<MTest::CConsoleSink>()
 /// Add file sink.

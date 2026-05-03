@@ -131,6 +131,13 @@ MTEST_UNIT_TEST_FIXTURE(MathOperations, CheckSomething2, MathOperationsFixture)
     MTEST_ASSERT_TRUE(MyField != *Tmp);
 }
 
+// Define simple test case that does not require fixture
+MTEST_SIMPLE_UNIT_TEST(Simple, SimpleFail)
+{
+    // This will always fail given test.
+    MTEST_FAIL("Simple Fail", false);
+}
+
 struct SimpleSkipFixture: public MTest::Fixture
 {
 };
